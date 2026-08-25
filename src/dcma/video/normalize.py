@@ -125,7 +125,9 @@ def normalize_video(
         transforms.append({"kind": "scale", "factor": scale,
                            "width": target_w, "height": target_h})
         if k is not None:
-            k = k.scaled_to_max_edge(max_edge)
+            # Yuvarlama kuralı tek yerde kalsın: ffmpeg'e verilen kesin hedef
+            # boyutu doğrudan K'ye uygula (K.width/height == kare boyutu).
+            k = k.resized_to(target_w, target_h)
         frame_w, frame_h = target_w, target_h
     else:
         frame_w, frame_h = rotated_w, rotated_h
