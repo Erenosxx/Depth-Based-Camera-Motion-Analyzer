@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎥 Depth-Based 6-Direction Motion Analyzer
+# 🎥 Depth-Based Camera Motion Analyzer
 
 **Tek bir monoküler videodan, hiçbir sensör verisi olmadan kamera hareket yönünü çıkarır.**
 
@@ -118,8 +118,8 @@ Bulunan yön etiketi, OpenCV ile orijinal videonun üzerine yazılır. Codec ola
 ## 🚀 Kurulum
 
 ```bash
-git clone https://github.com/Erenosxx/Depth-Based-6-DoF-Motion-Analyzer.git
-cd Depth-Based-6-DoF-Motion-Analyzer
+git clone https://github.com/Erenosxx/Depth-Based-Camera-Motion-Analyzer.git
+cd Depth-Based-Camera-Motion-Analyzer
 
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -253,7 +253,7 @@ Kilit içgörü: **2B hareketi tahmin etmeye çalışmak yerine 3B yapıyı çı
 ## 📂 Proje Yapısı
 
 ```
-Depth-Based-6-DoF-Motion-Analyzer/
+Depth-Based-Camera-Motion-Analyzer/
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
