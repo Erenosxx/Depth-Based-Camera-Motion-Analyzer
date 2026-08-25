@@ -201,8 +201,11 @@ kutuya atmasıydı; bu ayrım korunur.
 - Dönme metadata'sı **açıkça uygulanır** (ffmpeg autorotate), sonuç manifest'e yazılır.
 - Konum/GPS metadata'sı silinir.
 - Varsayılan olarak yerel çözünürlük korunur; `--max-edge` verilirse ölçeklenir ve `K` güncellenir.
-- Derinlik modeli çıktısı (`predicted_depth`) kare boyutuna bilinear resize edilir.
-  Pipeline'ın `depth` anahtarı (normalize edilmiş PIL görüntüsü) **kullanılmaz** — metrik değildir.
+- Derinlik haritası olarak `predicted_depth` kullanılır. Pipeline'ın `depth` anahtarı
+  (normalize edilmiş PIL görüntüsü) **kullanılmaz** — metrik değildir.
+- transformers 5.5.0'da `pipeline("depth-estimation")` çıktısını girdi boyutuna kendisi
+  getiriyor (doğrulandı: 1440×1440 girdi → `predicted_depth` shape `(1440, 1440)`).
+  Kod bunu **varsaymaz, doğrular**; boyut uyuşmazsa bilinear resize uygular.
 
 ## 7. Çıktılar
 
@@ -265,8 +268,30 @@ scipy 1.17.1, matplotlib 3.10.9, huggingface_hub 1.14.0.
 **İndirilmiş modeller:** `Depth-Anything-V2-Metric-{Indoor,Outdoor}-{Base,Large}-hf`,
 `apple/DepthPro-hf`. Varsayılan iç mekân checkpoint'i `Indoor-Large`.
 
-**Doğrulanacak risk:** transformers 5.5.0, `pipeline("depth-estimation")` API'sini v4'e
-göre değiştirmiş olabilir. Faz 1'in ilk işi bunu teyit etmek.
+### Doğrulanmış ortam bulguları (2026-08-25)
+
+**API teyit edildi.** `pipeline("depth-estimation")` transformers 5.5.0'da çalışıyor.
+Çıktı anahtarları `['predicted_depth', 'depth']`; `predicted_depth` bir `torch.Tensor` ve
+girdi boyutunda. `Indoor-Large` checkpoint'i gerçek iç mekân karesinde
+min 1.451 / medyan 2.638 / max 5.910 üretti — **metre ölçeğinde ve makul.**
+
+**`rotate=90` hipotezi doğrulandı.** Aynı kare ffmpeg'in `-noautorotate` ile çıkarılıp
+270° döndürüldüğünde varsayılan (autorotate) çıktısına **birebir eşit** (ortalama mutlak
+fark 0.000). Yani videoda gerçek bir 90° dönme var ve iki okuma yolu tam 90° sapıyor.
+OpenCV'nin bu etiketi uygulayıp uygulamadığı (`CAP_PROP_ORIENTATION_AUTO`) Faz 0'da
+cv2 ile birebir test edilecek.
+
+**Ayrı ortam zorunluluğu.** `LLM_training` ortamında `nvidia-cudnn-cu13` (9.19.0.56)
+dosyalarını `nvidia/cudnn/lib/` altına yazarak `nvidia-cudnn-cu12` (9.1.0.70) üzerine
+yazmış. torch 2.6.0+cu124 bu yoldan yüklediği için cuDNN 9.19 alıyor; sürücü 535.261.03
+ile initialize olmuyor ve **her `conv2d` çağrısı `CUDNN_STATUS_NOT_INITIALIZED` ile
+patlıyor** (`matmul` etkilenmiyor). Derinlik modelleri konvolüsyon ağı olduğundan GPU'da
+çalışmıyor. `nvidia-cudnn-cu13` paketinin `Required-by` alanı boş; muhtemel kaynak
+`torchao 0.15.0` (torch 2.6.0+cu124 ile uyumsuz olduğu uyarısı veriyor).
+
+**Karar:** `LLM_training` ortamına dokunulmaz (aktif Gemma eğitimi barındırıyor).
+Proje kendi `dcma` conda ortamında geliştirilir; HF cache paylaşımlı kaldığı için
+indirilmiş 5.1 GB model yeniden inmez.
 
 ## 11. Intrinsics stratejisi
 
