@@ -1,0 +1,12 @@
+# Depth-Based 6-Direction Motion Analyzer
+# Kurulum: pip install -r requirements.txt
+#
+# NOT: torch'u kendi CUDA sürümünüze göre kurmanız önerilir:
+#   https://pytorch.org/get-started/locally/
+
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.30.0
+pillow>=10.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0

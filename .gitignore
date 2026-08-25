@@ -1,0 +1,38 @@
+# --- Ham / ağır medya (GitHub 100 MB dosya limitini aşar) ---
+Data/
+*.mp4
+*.avi
+*.mov
+*.mkv
+# Demo görselleri istisna: assets/ altındakiler repoya girer
+!assets/*.gif
+!assets/*.png
+!assets/*.jpg
+
+# --- Çıkarılmış video kareleri ---
+Video_Frames/
+frames/
+*.jpg
+*.jpeg
+!assets/*.jpg
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# --- Model / cache ---
+.cache/
+*.pt
+*.pth
+*.safetensors
+
+# --- OS / editör ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
