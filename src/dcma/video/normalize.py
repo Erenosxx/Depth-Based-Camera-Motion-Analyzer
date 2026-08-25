@@ -122,7 +122,13 @@ def normalize_video(
         target_w = int(round(rotated_w * scale))
         target_h = int(round(rotated_h * scale))
         vf.append(f"scale={target_w}:{target_h}:flags=lanczos")
-        transforms.append({"kind": "scale", "factor": scale,
+        # Eksen basina GERCEK faktorleri kaydet. Tek bir skaler yazmak
+        # yaniltici olur: width ve height bagimsiz yuvarlandigi icin uygulanan
+        # olcek iki eksende farklidir, ve manifest'ten dönüşümü yeniden kuran
+        # biri o skaleri kullanirsa anizotropi hatasini geri getirir.
+        transforms.append({"kind": "scale",
+                           "factor_x": target_w / rotated_w,
+                           "factor_y": target_h / rotated_h,
                            "width": target_w, "height": target_h})
         if k is not None:
             # Yuvarlama kuralı tek yerde kalsın: ffmpeg'e verilen kesin hedef
