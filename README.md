@@ -143,7 +143,7 @@ ffmpeg -i girdi.mp4 Video_Frames/Frame_%04d.jpg
 
 ### 2. Yolları ayarla
 
-[`Scripts/Distance_mesurement_4_2.py`](Scripts/Distance_mesurement_4_2.py) içindeki üç
+[`Scripts/legacy_distance_4_2.py`](Scripts/legacy_distance_4_2.py) içindeki üç
 değişkeni kendi ortamınıza göre düzenleyin:
 
 ```python
@@ -155,7 +155,7 @@ output_video_path = "/yol/out/annotated.mp4"    # üretilecek video
 ### 3. Çalıştır
 
 ```bash
-python Scripts/Distance_mesurement_4_2.py
+python Scripts/legacy_distance_4_2.py
 ```
 
 Script sırayla: kareleri yükler → her kare çifti için derinlik tahmini yapar →
@@ -259,7 +259,7 @@ Depth-Based-Camera-Motion-Analyzer/
 ├── .gitignore
 ├── assets/                              # README görselleri (demo GIF buraya)
 └── Scripts/
-    ├── Distance_mesurement_4_2.py       # Ana pipeline: derinlik → 6 yön → annotate
+    ├── legacy_distance_4_2.py           # eski sezgisel yöntem (tarihsel)
     └── make_demo_gif.sh                 # Çıktı videosundan README GIF'i üretir
 ```
 

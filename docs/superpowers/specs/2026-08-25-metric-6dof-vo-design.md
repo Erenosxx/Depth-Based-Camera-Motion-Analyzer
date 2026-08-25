@@ -278,8 +278,15 @@ min 1.451 / medyan 2.638 / max 5.910 üretti — **metre ölçeğinde ve makul.*
 **`rotate=90` hipotezi doğrulandı.** Aynı kare ffmpeg'in `-noautorotate` ile çıkarılıp
 270° döndürüldüğünde varsayılan (autorotate) çıktısına **birebir eşit** (ortalama mutlak
 fark 0.000). Yani videoda gerçek bir 90° dönme var ve iki okuma yolu tam 90° sapıyor.
-OpenCV'nin bu etiketi uygulayıp uygulamadığı (`CAP_PROP_ORIENTATION_AUTO`) Faz 0'da
-cv2 ile birebir test edilecek.
+**OpenCV sorusu Faz 0'da ölçüldü ve kapandı.** Bu makinede (OpenCV 5.0)
+`cv2.VideoCapture` dönme etiketini **uyguluyor** (`CAP_PROP_ORIENTATION_AUTO`).
+Bağımsız doğrulama: çıplak cv2 karesi ile ffmpeg autorotate karesinin ortalama mutlak
+farkı döndürmesiz **0.000**, 90°/180°/270° döndürmelerde 55.7 / 54.1 / 55.7.
+
+Sonuç: eski pipeline'da şüphelenilen analiz-annotation oryantasyon uyumsuzluğu
+**fiilen mevcut değildi**; `SAĞA/SOLA` ile `YUKARI/AŞAĞI` yer değiştirmemiş. Ancak bu
+garanti OpenCV derlemesine bağlı, dile ait değil — `src/dcma/video/orientation.py`
+cevabı sabitlemez, her çağrıda ölçer ve yalnızca gerekiyorsa döndürür.
 
 **Ayrı ortam zorunluluğu.** `LLM_training` ortamında `nvidia-cudnn-cu13` (9.19.0.56)
 dosyalarını `nvidia/cudnn/lib/` altına yazarak `nvidia-cudnn-cu12` (9.1.0.70) üzerine

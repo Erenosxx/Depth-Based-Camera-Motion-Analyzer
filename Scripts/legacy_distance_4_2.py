@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-6 Yönlü Hareket Analizi ve Video Annotation Sistemi
-İleri, Geri, Sağa, Sola, Yukarı, Aşağı hareketlerini tespit eder ve videoya embed eder
+[ESKİ / LEGACY] 6 Yönlü Hareket Analizi ve Video Annotation Sistemi
+
+Bu script, projenin 4. deneme aşamasıdır ve tarihsel referans olarak korunuyor.
+Göreli (affine-invariant) derinlik haritalarının 3×3 bölge ortalamalarını
+karşılaştırıp kategorik bir yön etiketi üretir; metre üretmez.
+
+Yerine geçen: src/dcma/ altındaki metrik görsel odometri pipeline'ı.
+Gerekçe: docs/superpowers/specs/2026-08-25-metric-6dof-vo-design.md
 """
 
 from transformers import pipeline
