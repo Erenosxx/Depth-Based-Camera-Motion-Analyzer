@@ -84,10 +84,12 @@ def analyze_regional_changes(depth_changes, threshold):
     else:
         return "BELİRSİZ"
 
-# Video ve frame path'leri
-video_path = "/path/to/sample.mp4"
-frames_path = "/path/to/Video_Frames"
-output_video_path = "/path/to/annotated.mp4"
+# Video ve frame path'leri - kendi ortaminiza gore duzenleyin
+# frames_path icindeki JPG kareleri once cikarin:
+#   ffmpeg -i girdi.mp4 Video_Frames/Frame_%04d.jpg
+video_path = "path/to/input.mp4"                      # annotate edilecek orijinal video
+frames_path = "path/to/Video_Frames"                  # cikarilmis JPG kareler
+output_video_path = "path/to/out/annotated_6_direction.mp4"   # uretilecek video
 
 print("🎥 6 Yönlü Hareket Analizi ve Video Annotation")
 print("="*60)
