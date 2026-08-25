@@ -1,0 +1,13 @@
+[project]
+name = "dcma"
+version = "0.1.0"
+description = "Depth-based camera motion analyzer"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+    "needs_video: gerçek örnek video gerektirir",
+    "needs_gpu: CUDA gerektirir",
+]
