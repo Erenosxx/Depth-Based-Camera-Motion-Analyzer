@@ -106,19 +106,27 @@ video (her format)
 git clone https://github.com/Erenosxx/Depth-Based-Camera-Motion-Analyzer.git
 cd Depth-Based-Camera-Motion-Analyzer
 
-# önerilen: ayrı conda ortamı (dcma). LLM_training ortamına paket kurmayın.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
 > 💡 `torch`'u kendi CUDA sürümünüze göre kurun:
 > [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/)
+> Ayrı bir sanal ortam kullanın; başka projelerin ortamına paket kurmayın.
 
 Metrik Indoor/Outdoor checkpoint’leri ilk çalışmada Hugging Face’den iner.
 `ffmpeg` / `ffprobe` annotate video (H.264) için gerekli.
 
-Bu makinede (`dev-host`) çalıştırma: `VIRTUAL_ENV` tuzaklarına karşı mutlak yol kullanın
-(aşağıdaki Kullanım bloğu).
+Makineye özel yorumlayıcı yolu (conda yolu, `VIRTUAL_ENV` çakışması vb.) **repoya yazılmaz.**
+Bir kez kopyalayıp kendi değerlerinizi girin:
+
+```bash
+cp local.env.example local.env
+# local.env örneği (temsili — gerçek yolunuz farklı olur):
+#   DCMA_PYTHON=/path/to/envs/dcma/bin/python
+```
+
+`local.env` `.gitignore`’dadır.
 
 ---
 
@@ -126,10 +134,22 @@ Bu makinede (`dev-host`) çalıştırma: `VIRTUAL_ENV` tuzaklarına karşı mutl
 
 Ham videolar `Data/`, işlenmiş çıktılar `Result/` altına gider (ikisi de git’te yok).
 
-```bash
-export DPY=/path/to/envs/dcma/bin/python
+Sanal ortam zaten aktifse:
 
-env -u VIRTUAL_ENV PYTHONNOUSERSITE=1 PYTHONPATH=src $DPY -m dcma.cli \
+```bash
+PYTHONPATH=src python -m dcma.cli \
+  --video "Data/girdi.mp4" \
+  --out "Result/calisma_adi" \
+  --scene indoor \
+  --size large \
+  --interval 0.15 \
+  --max-edge 768
+```
+
+`local.env` tanımlıysa aynı çağrı sarmalayıcıyla (yorumlayıcı yolu dışarı sızmaz):
+
+```bash
+./Scripts/dcma.sh -m dcma.cli \
   --video "Data/girdi.mp4" \
   --out "Result/calisma_adi" \
   --scene indoor \
@@ -144,8 +164,7 @@ ve atlanan kare sayısı basılır.
 Yalnızca görseli yenilemek (derinlik tekrar çalışmaz):
 
 ```bash
-env -u VIRTUAL_ENV PYTHONNOUSERSITE=1 PYTHONPATH=src $DPY -m dcma.viz.annotate \
-  --run Result/calisma_adi
+./Scripts/dcma.sh -m dcma.viz.annotate --run Result/calisma_adi
 ```
 
 Eski 3×3 sezgisel yöntem tarihsel referans olarak duruyor: `Scripts/legacy_distance_4_2.py`.
@@ -232,6 +251,7 @@ Depth-Based-Camera-Motion-Analyzer/
 ├── Data/                     # ham videolar (repoya girmez)
 ├── Result/                   # işlenmiş çıktılar (repoya girmez)
 ├── Scripts/
+│   ├── dcma.sh               # local.env'deki yorumlayıcıyla çalıştırır
 │   ├── legacy_distance_4_2.py
 │   └── make_demo_gif.sh
 ├── src/dcma/                 # metrik VO + görselleştirme
@@ -240,6 +260,7 @@ Depth-Based-Camera-Motion-Analyzer/
 ├── assets/
 │   ├── demo.gif              # README: tüm çekimin annotate GIF’i
 │   └── plot.png              # README: yörünge özeti
+├── local.env.example         # kopyalayıp local.env yapın (git'e girmez)
 ├── README.md
 ├── pyproject.toml
 └── requirements.txt

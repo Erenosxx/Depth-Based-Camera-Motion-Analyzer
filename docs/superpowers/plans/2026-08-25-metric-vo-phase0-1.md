@@ -14,29 +14,25 @@
 
 ## Ortam — okumadan başlamayın
 
-Proje **`dcma`** conda ortamında geliştirilir. `LLM_training` ortamına **dokunulmaz**
-(aktif Gemma eğitimi barındırıyor ve cuDNN yığını bozuk: `nvidia-cudnn-cu13`,
-`nvidia-cudnn-cu12`'nin üzerine yazdığı için her `conv2d` çağrısı
-`CUDNN_STATUS_NOT_INITIALIZED` veriyor).
+Proje ayrı bir `dcma` ortamında geliştirilir. Başka eğitim ortamlarına paket kurulmaz.
 
-**Tuzak:** Bu makinenin shell'inde `VIRTUAL_ENV=/path/to/envs/other_project`
-set edilmiş durumda. `pip` bu değişkeni conda ortamına **tercih eder**, dolayısıyla
-`conda run -n dcma pip install ...` paketleri sessizce `LLM_training`'e kurar.
-
-Her python/pip çağrısında ortamın doğru olduğundan emin olmak için:
+**Tuzak:** Shell’de başka bir projenin `VIRTUAL_ENV` değişkeni set ise `pip` onu
+conda ortamına tercih edebilir. Yorumlayıcı yolunu **`local.env`** içine yazın
+(bu dosya git’e girmez; şablon: `local.env.example`).
 
 ```bash
-export DPY=/path/to/envs/dcma/bin/python
-alias dpy='env -u VIRTUAL_ENV -u PYTHONPATH $DPY'
-# dogrulama - her zaman /path/to/envs/dcma yazmali:
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -c "import sys; print(sys.prefix)"
+cp local.env.example local.env
+# temsili: DCMA_PYTHON=/path/to/envs/dcma/bin/python
+
+# dogrulama — sys.prefix, local.env'deki ortama işaret etmeli:
+./Scripts/dcma.sh -c "import sys; print(sys.prefix)"
 ```
 
 Testleri çalıştırma biçimi (planın her yerinde bu kullanılır):
 
 ```bash
 cd <repo-koku>
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/ -v
+./Scripts/dcma.sh -m pytest tests/ -v
 ```
 
 ---
@@ -93,7 +89,7 @@ def test_package_imports_and_has_version():
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_package.py -v
+./Scripts/dcma.sh -m pytest tests/test_package.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma'`
 
@@ -168,7 +164,7 @@ def cuda_device():
 - [ ] **Step 4: Testin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_package.py -v
+./Scripts/dcma.sh -m pytest tests/test_package.py -v
 ```
 Beklenen: `1 passed`
 
@@ -295,7 +291,7 @@ def test_crop_outside_bounds_rejected():
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_intrinsics.py -v
+./Scripts/dcma.sh -m pytest tests/test_intrinsics.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.calib.intrinsics'`
 
@@ -412,7 +408,7 @@ class Intrinsics:
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_intrinsics.py -v
+./Scripts/dcma.sh -m pytest tests/test_intrinsics.py -v
 ```
 Beklenen: `14 passed`
 
@@ -503,7 +499,7 @@ def test_stride_for_interval_rounds_to_at_least_one(tmp_path):
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_manifest.py -v
+./Scripts/dcma.sh -m pytest tests/test_manifest.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.video.manifest'`
 
@@ -591,7 +587,7 @@ class VideoManifest:
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_manifest.py -v
+./Scripts/dcma.sh -m pytest tests/test_manifest.py -v
 ```
 Beklenen: `5 passed`
 
@@ -670,7 +666,7 @@ def test_max_edge_downscales_and_updates_intrinsics(sample_video, ffmpeg_availab
 
 ```bash
 export DCMA_SAMPLE_VIDEO=/path/to/sample.mp4
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_normalize.py -v
+./Scripts/dcma.sh -m pytest tests/test_normalize.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.video.normalize'`
 
@@ -846,7 +842,7 @@ def normalize_video(
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_normalize.py -v
+./Scripts/dcma.sh -m pytest tests/test_normalize.py -v
 ```
 Beklenen: `4 passed`
 
@@ -910,7 +906,7 @@ def test_read_frame_upright_matches_ffmpeg_frame(sample_video, ffmpeg_available,
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_orientation_cv2.py -v
+./Scripts/dcma.sh -m pytest tests/test_orientation_cv2.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.video.orientation'`
 
@@ -997,7 +993,7 @@ def read_frame_upright(video_path: str | Path, index: int) -> np.ndarray | None:
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_orientation_cv2.py -v -s
+./Scripts/dcma.sh -m pytest tests/test_orientation_cv2.py -v -s
 ```
 Beklenen: `2 passed`. Çıktıda `rotation_tag=90  cv2_autorotate=<True|False>` satırı görünür —
 bu değeri bir sonraki commit mesajına yazın; Faz 0'ın cevabı budur.
@@ -1047,7 +1043,7 @@ Gerekçe: docs/superpowers/specs/2026-08-25-metric-6dof-vo-design.md
 - [ ] **Step 3: Testlerin hâlâ geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/ -v
+./Scripts/dcma.sh -m pytest tests/ -v
 ```
 Beklenen: tüm testler geçer (bu görev kod yolu değiştirmedi)
 
@@ -1131,7 +1127,7 @@ def test_cache_returns_identical_array_without_recompute(cuda_device, tmp_path):
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_depth_backend.py -v
+./Scripts/dcma.sh -m pytest tests/test_depth_backend.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.depth.depth_anything'`
 
@@ -1248,7 +1244,7 @@ class DepthAnythingMetric(DepthBackend):
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_depth_backend.py -v
+./Scripts/dcma.sh -m pytest tests/test_depth_backend.py -v
 ```
 Beklenen: `5 passed`
 
@@ -1329,7 +1325,7 @@ def test_blank_images_yield_no_matches():
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_features.py -v
+./Scripts/dcma.sh -m pytest tests/test_features.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.vo.features'`
 
@@ -1374,7 +1370,7 @@ def detect_and_match(gray1: np.ndarray, gray2: np.ndarray,
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_features.py -v
+./Scripts/dcma.sh -m pytest tests/test_features.py -v
 ```
 Beklenen: `3 passed`
 
@@ -1502,7 +1498,7 @@ def test_too_few_points_returns_none():
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_pose.py -v
+./Scripts/dcma.sh -m pytest tests/test_pose.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.vo.pose'`
 
@@ -1604,7 +1600,7 @@ def estimate_pose(P3d: np.ndarray, p2: np.ndarray, K: Intrinsics,
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_pose.py -v
+./Scripts/dcma.sh -m pytest tests/test_pose.py -v
 ```
 Beklenen: `6 passed`. Herhangi biri başarısızsa **devam etmeyin** — işaret veya
 konvansiyon hatası vardır ve sonraki her sayı yanlış olur.
@@ -1713,7 +1709,7 @@ def test_export_dict_has_per_step_records():
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_trajectory.py -v
+./Scripts/dcma.sh -m pytest tests/test_trajectory.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.vo.trajectory'`
 
@@ -1810,7 +1806,7 @@ class Trajectory:
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_trajectory.py -v
+./Scripts/dcma.sh -m pytest tests/test_trajectory.py -v
 ```
 Beklenen: `5 passed`
 
@@ -1882,7 +1878,7 @@ def test_end_to_end_writes_trajectory(sample_video, ffmpeg_available, cuda_devic
 - [ ] **Step 2: Başarısız olduğunu doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_cli.py -v
+./Scripts/dcma.sh -m pytest tests/test_cli.py -v
 ```
 Beklenen: `ModuleNotFoundError: No module named 'dcma.cli'`
 
@@ -2018,14 +2014,14 @@ if __name__ == "__main__":
 - [ ] **Step 4: Testlerin geçtiğini doğrula**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/test_cli.py -v
+./Scripts/dcma.sh -m pytest tests/test_cli.py -v
 ```
 Beklenen: `4 passed`
 
 - [ ] **Step 5: Tüm test paketini çalıştır**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m pytest tests/ -v
+./Scripts/dcma.sh -m pytest tests/ -v
 ```
 Beklenen: tüm testler geçer, hiçbiri hata vermez
 
@@ -2048,8 +2044,8 @@ Bu görev kod yazmaz; pipeline'ın gerçek veride ne ürettiğini **kayda geçir
 - [ ] **Step 1: İç mekân videosunda çalıştır**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m dcma.cli \
-  --video "/path/to/sample.mp4" \
+./Scripts/dcma.sh -m dcma.cli \
+  --video "$DCMA_SAMPLE_VIDEO" \
   --out /tmp/dcma_run1 \
   --scene indoor --size large --interval 0.15 --max-edge 768
 ```
@@ -2057,7 +2053,7 @@ env -u VIRTUAL_ENV -u PYTHONPATH $DPY -m dcma.cli \
 - [ ] **Step 2: Çıktıyı incele**
 
 ```bash
-env -u VIRTUAL_ENV -u PYTHONPATH $DPY - <<'PY'
+./Scripts/dcma.sh - <<'PY'
 import json
 d = json.load(open("/tmp/dcma_run1/trajectory.json"))
 print("adim       :", d["step_count"], " atlanan:", len(d["skipped"]))
