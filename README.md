@@ -20,10 +20,12 @@ ve sonuç annotate videoya, grafiklere yazılır.
 
 ## 🎬 Demo
 
-İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin annotate özeti (5× hız, 8 fps, 56 kare) ve yörünge grafiği:
+İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin annotate özeti (6× hız, 6 fps, 35 kare) ve yörünge grafiği:
 
 <div align="center">
-<img src="assets/demo.gif" width="360" alt="Annotate video GIF: renkli izler, HUD ve minimap, tüm çekim">
+
+![Annotate video: renkli izler, HUD ve minimap, tüm çekim](assets/demo.gif)
+
 </div>
 
 **`demo.gif` — tüm çekim, seyrek karelerle.** Ne görünüyor:
