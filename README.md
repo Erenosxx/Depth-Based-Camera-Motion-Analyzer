@@ -2,17 +2,17 @@
 
 # 🎥 Depth-Based Camera Motion Analyzer
 
-**Tek bir monoküler videodan, hiçbir sensör verisi olmadan kamera hareket yönünü çıkarır.**
+**Tek bir monoküler videodan, IMU/GPS olmadan, kamera hareketini metre cinsinden 6-DoF olarak çıkarır.**
 
-Her kare için [Depth Anything V2](https://huggingface.co/depth-anything/Depth-Anything-V2-base-hf)
-ile derinlik haritası üretilir; ardışık karelerin **bölgesel derinlik değişimi** karşılaştırılarak
-kameranın 6 yönden hangisine hareket ettiği belirlenir ve sonuç doğrudan videoya gömülür.
+[Depth Anything V2](https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-Indoor-Large-hf)
+metrik derinlik + ORB eşleme + PnP RANSAC ile kareler arası poz çözülür; yörünge birikir
+ve sonuç annotate videoya, grafiklere yazılır.
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.1%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.6-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![Transformers](https://img.shields.io/badge/🤗%20Transformers-4.40%2B-FFD21E)](https://huggingface.co/docs/transformers)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/)
-![Status](https://img.shields.io/badge/status-araştırma%20prototipi-orange)
+![Status](https://img.shields.io/badge/status-V1%20araştırma%20prototipi-orange)
 
 </div>
 
@@ -20,98 +20,81 @@ kameranın 6 yönden hangisine hareket ettiği belirlenir ve sonuç doğrudan vi
 
 ## 🎬 Demo
 
-> 🚧 **Yeni demo çekimi hazırlanıyor.** Daha kontrollü bir çekim yapıldıktan sonra
-> annotate edilmiş demo GIF'i buraya eklenecek.
+İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin işlenmiş karesi ve yörünge özeti:
 
-<!-- Yeni video hazır olduğunda:
-     ./Scripts/make_demo_gif.sh out/annotated_6_direction.mp4 assets/demo.gif 12 640
-     ve aşağıdaki satırın yorumunu kaldır: -->
-<!-- <div align="center"><img src="assets/demo.gif" width="640" alt="6 yönlü hareket analizi demosu"></div> -->
+<div align="center">
+<img src="assets/preview.png" width="360" alt="Annotate video karesi: renkli izler, HUD ve minimap">
+</div>
 
-Videonun sağ alt köşesinde o anki hareket yönü renk kodlu olarak, sol üstte kare numarası,
-sol altta ise yön dağılımı görünür.
+**`preview.png` — annotate videodan tek kare.** Ne görünüyor:
+
+| Bölge | Anlamı |
+|:---|:---|
+| **Renkli noktalar + kuyruk** | Her nokta ayrı bir özellik; rengi sabittir. Arkada kalan çizgi o noktanın **ekrandaki gerçek yoludur** (kare-kare Lucas-Kanade), iki uç arasında çekilmiş düz kiriş değildir. |
+| **Sol üst yazılar** | Kare numarası ve o ana kadar biriken metre: `ileri` / `saga` / `yukari`. |
+| **Sol alt kare (minimap)** | Kuş bakışı yörünge. **Yeşil** = çekimin başlangıcı, **kırmızı** = kameranın şu anki yeri, beyaz çizgi = o ana kadar gidilen yol. Kamera yeşil–kırmızı mesafesine göre kayar; mesafe azalınca (geri dönüş) görüş donar. Noktalar kenara yakın durur, değmez. |
+| **Sağ alt etiket** | O anki baskın öteleme yönü: İLERİ, GERİ, SAĞA, SOLA, YUKARI, AŞAĞI veya DURAGAN. |
+
+<div align="center">
+<img src="assets/plot.png" width="720" alt="Üstten yörünge ve yükseklik profili">
+</div>
+
+**`plot.png` — tüm çekimin özeti (tek bakışta).** Ne görünüyor:
+
+| Panel | Anlamı |
+|:---|:---|
+| **Üstten görünüm** (sol) | Dünya düzlemi: yatay eksen **sağa (m)**, dikey eksen **ileri (m)**. Yeşil nokta başlangıç, kırmızı nokta bitiş. Çizgi kameranın yerde bıraktığı izdir. |
+| **Yükseklik profili** (sağ) | Adım adım **yukarı (m)**. El kamerasının salınımı ve kat çıkışı burada okunur. |
+| **Başlık** | `net` = başlangıç–bitiş kuş uçuşu mesafe. `yol` = odometre (gidilen toplam yol). Gidip dönünce yol büyür, net küçük kalır — bu beklenen ayrım. |
+
+Asıl teslim dosyası `Result/<ad>.mp4` (H.264, kaynak FPS). `Result/<ad>/frames/` ham kare önbelleğidir; çıktı değildir.
 
 ---
 
 ## 📌 Ne Yapar?
 
-Klasik yaklaşımlar kamera hareketini **optik akış** ile (piksellerin 2B kayması) tahmin eder.
-Bu yöntemin temel zaafı, *sahnedeki nesne hareketi* ile *kameranın kendi hareketini*
-ayırt edememesidir. Bu proje bunun yerine **sahnenin 3B yapısındaki değişime** bakar:
+Klasik optik akış 2B piksel kaymasına bakar ve sahne hareketi ile kamera hareketini karıştırır.
+Bu sistem **metrik derinlikle 3B nokta** kurar, sonraki karedeki 2B izdüşümden `solvePnPRansac`
+ile pozu çözer ve metre cinsinden biriktirir.
 
-> Kamera ileri giderse **her yer** yakınlaşır. Kamera sağa kayarsa sol taraf uzaklaşırken
-> sağ taraf yakınlaşır. Bu asimetri, derinlik haritasının bölgesel istatistiklerinde okunabilir.
+Çıktı kategorik etiket değil: **ileri / sağa / yukarı metre**, kümülatif yörünge ve anlık yön.
 
-### Tespit Edilen Yönler
+> Kamera ileri giderse derinlik azalır ve PnP `+z` ötelemesi üretir. Sağa kayınca noktalar
+> sola kayar; bu, bölge ortalaması sezgisinden bağımsız geometrik bir ölçüdür.
 
-| Yön | Ekrandaki Renk | Anlamı |
+### Anlık yön (videodaki etiket)
+
+| Yön | Ekrandaki renk | Anlamı |
 |:---|:---|:---|
-| **İLERİ** | 🟢 Yeşil | Kamera sahneye yaklaşıyor |
+| **İLERİ** | 🟢 Yeşil | Kamera sahneye yaklaşıyor (`+z`) |
 | **GERİ** | 🔴 Kırmızı | Kamera sahneden uzaklaşıyor |
-| **SAĞA** | 🔵 Mavi | Kamera sağa öteleniyor |
+| **SAĞA** | 🔵 Mavi | Kamera sağa öteleniyor (`+x`) |
 | **SOLA** | 🩵 Cyan | Kamera sola öteleniyor |
-| **YUKARI** | 🟣 Magenta | Kamera yukarı öteleniyor |
+| **YUKARI** | 🟣 Magenta | Kamera yukarı öteleniyor (`−y`, OpenCV) |
 | **AŞAĞI** | 🟡 Sarı | Kamera aşağı öteleniyor |
-| **BELİRSİZ** | ⚪ Beyaz | Baskın bir yön kuralı tetiklenmedi |
+| **DURAGAN** | ⚪ Gri | Bu adımda baskın öteleme yok |
 
-> ℹ️ Bunlar **3 eksen × 2 yön = 6 öteleme yönüdür.** Dönme (pan / tilt / roll) şu an
-> tespit edilmiyor — bkz. [Bilinen Sınırlamalar](#-bilinen-sınırlamalar).
+Bunlar 3 öteleme ekseni × 2 yön. Dönme (pan / tilt / roll) pozun içinde çözülür ama
+etiket olarak ayrıştırılmaz — bkz. [Bilinen Sınırlamalar](#-bilinen-sınırlamalar).
 
 ---
 
 ## ⚙️ Nasıl Çalışır?
 
 ```
-   Video                 Kareler              Depth Anything V2         3×3 Bölgesel
- (.mp4)      ──────▶   Frame_0001.jpg  ──────▶   derinlik haritası  ──────▶   ortalamalar
-                       Frame_0002.jpg               (H×W float)              (9 değer)
-                            ...                                                  │
-                                                                                 ▼
-   Annotate                  Yön kuralları              Δ = kare[i+5] − kare[i]
-   edilmiş     ◀──────    (eşik = 0.01)      ◀──────    bölgesel fark matrisi
-    video
+video (her format)
+   → normalize     PNG kare + manifest (dönme uygulanır, K güncellenir)
+   → metrik derinlik   Depth-Anything V2 Indoor/Outdoor (önbellekli, metre)
+   → ORB eşleme → geri izdüşüm → PnP RANSAC → ΔT
+   → yörünge birikimi
+   → trajectory.json + plot.png + annotated.mp4 (H.264)
 ```
 
-### 1️⃣ Derinlik Tahmini
-Her kare `depth-anything/Depth-Anything-V2-base-hf` modeline verilir; model piksel başına
-bir derinlik değeri üretir. GPU varsa `accelerate` üzerinden otomatik seçilir.
-
-### 2️⃣ 3×3 Bölgesel Özetleme
-Derinlik haritası 9 bölgeye bölünür ve her bölgenin **ortalaması** alınır. Bu adım gürültüyü
-bastırır ve haritayı 9 sayıya indirir.
-
-```
-┌─────────┬─────────┬─────────┐
-│  (0,0)  │  (0,1)  │  (0,2)  │  ◀── üst satır   → YUKARI / AŞAĞI sinyali
-├─────────┼─────────┼─────────┤
-│  (1,0)  │  (1,1)  │  (1,2)  │
-├─────────┼─────────┼─────────┤
-│  (2,0)  │  (2,1)  │  (2,2)  │  ◀── alt satır
-└─────────┴─────────┴─────────┘
-     ▲                   ▲
- sol sütun            sağ sütun  → SAĞA / SOLA sinyali
-```
-
-### 3️⃣ Zamansal Fark
-`kare[i]` ile `kare[i+5]` karşılaştırılır. **5 kare aralığı** bilinçli bir seçimdir: ardışık
-kareler arasındaki hareket, modelin tahmin gürültüsünün altında kalacak kadar küçüktür.
-
-### 4️⃣ Yön Kuralları
-`Δ = bölge_ortalamaları[i+5] − bölge_ortalamaları[i]` matrisi üzerinde, ilk eşleşen kural kazanır:
-
-| Koşul (eşik `τ = 0.01`) | Sonuç |
-|:---|:---|
-| **9 bölgenin tamamında** `Δ < −τ` | **İLERİ** |
-| **9 bölgenin tamamında** `Δ > +τ` | **GERİ** |
-| `mean(sol sütun) > τ` **ve** `mean(sağ sütun) < −τ` | **SAĞA** |
-| `mean(sol sütun) < −τ` **ve** `mean(sağ sütun) > τ` | **SOLA** |
-| `mean(üst satır) > τ` **ve** `mean(alt satır) < −τ` | **YUKARI** |
-| `mean(üst satır) < −τ` **ve** `mean(alt satır) > τ` | **AŞAĞI** |
-| yukarıdakilerin hiçbiri | **BELİRSİZ** |
-
-### 5️⃣ Video Annotation
-Bulunan yön etiketi, OpenCV ile orijinal videonun üzerine yazılır. Codec olarak sırayla
-`H264 → XVID → MP4V → MJPG` denenir; sistemde çalışan ilk codec kullanılır.
+1. **Normalizasyon.** ffprobe + ffmpeg; `rotate` etiketi açıkça uygulanır. Kareler kayıpsız PNG.
+2. **Metrik derinlik.** Varsayılan `Indoor-Large`. Her kare modele bir kez girer; sonuç disk önbelleğinde.
+3. **Poz.** Kaynak karenin 3B noktaları + hedef karenin 2B eşleşmeleri → `solvePnPRansac`.
+4. **Birikim.** Odometre (adımların toplamı) ile net yer değiştirme (başlangıç–bitiş) ayrı tutulur.
+5. **Görselleştirme.** Yön HUD’u yörüngeden; nokta izleri ise kare-kare Lucas-Kanade’den (VO’dan bağımsız).
 
 ---
 
@@ -121,24 +104,25 @@ Bulunan yön etiketi, OpenCV ile orijinal videonun üzerine yazılır. Codec ola
 git clone https://github.com/Erenosxx/Depth-Based-Camera-Motion-Analyzer.git
 cd Depth-Based-Camera-Motion-Analyzer
 
+# önerilen: ayrı conda ortamı (dcma). LLM_training ortamına paket kurmayın.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> 💡 `torch`'u kendi CUDA sürümünüze uygun kurmanız önerilir:
+> 💡 `torch`'u kendi CUDA sürümünüze göre kurun:
 > [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/)
 
-Model ilk çalıştırmada Hugging Face'den otomatik indirilir (~200 MB, base checkpoint).
+Metrik Indoor/Outdoor checkpoint’leri ilk çalışmada Hugging Face’den iner.
+`ffmpeg` / `ffprobe` annotate video (H.264) için gerekli.
+
+Bu makinede (`dev-host`) çalıştırma: `VIRTUAL_ENV` tuzaklarına karşı mutlak yol kullanın
+(aşağıdaki Kullanım bloğu).
 
 ---
 
 ## 🧪 Kullanım
 
-Ham videolar `Data/`, işlenmiş çıktılar `Result/` altına gider.
-
-### Yeni sistem (metrik 6-DoF)
-
-`dcma` conda ortamında, repo kökünden:
+Ham videolar `Data/`, işlenmiş çıktılar `Result/` altına gider (ikisi de git’te yok).
 
 ```bash
 export DPY=/path/to/envs/dcma/bin/python
@@ -152,71 +136,36 @@ env -u VIRTUAL_ENV PYTHONNOUSERSITE=1 PYTHONPATH=src $DPY -m dcma.cli \
   --max-edge 768
 ```
 
-Çıktı: `trajectory.json`, `annotated.mp4` (ORB noktaları + kümülatif metre + mini yörünge), `plot.png`.
+`--scene indoor|outdoor` zorunlu (`auto` henüz yok). Konsolda odometre, net yer değiştirme
+ve atlanan kare sayısı basılır.
 
-Yalnızca görsel üretmek (derinlik tekrar çalışmaz):
+Yalnızca görseli yenilemek (derinlik tekrar çalışmaz):
 
 ```bash
 env -u VIRTUAL_ENV PYTHONNOUSERSITE=1 PYTHONPATH=src $DPY -m dcma.viz.annotate \
   --run Result/calisma_adi
 ```
 
-### Eski sistem (kategorik yön etiketi)
-
-#### 1. Video karelerini çıkar
-
-```bash
-mkdir -p Video_Frames
-ffmpeg -i Data/girdi.mp4 Video_Frames/Frame_%04d.jpg
-```
-
-#### 2. Yolları ayarla
-
-[`Scripts/legacy_distance_4_2.py`](Scripts/legacy_distance_4_2.py) içindeki üç
-değişkeni kendi ortamınıza göre düzenleyin:
-
-```python
-video_path        = "Data/girdi.mp4"            # annotate edilecek orijinal video
-frames_path       = "Video_Frames"              # çıkarılmış JPG kareler
-output_video_path = "Result/annotated.mp4"      # üretilecek video
-```
-
-#### 3. Çalıştır
-
-```bash
-python Scripts/legacy_distance_4_2.py
-```
-
-Script sırayla: kareleri yükler → her kare çifti için derinlik tahmini yapar →
-yön analizini uygular → annotate edilmiş videoyu yazar → çıktıyı doğrular.
-
-#### 4. (İsteğe bağlı) README için demo GIF üret
-
-```bash
-./Scripts/make_demo_gif.sh Result/annotated.mp4 assets/demo.gif 12 640
-```
+Eski 3×3 sezgisel yöntem tarihsel referans olarak duruyor: `Scripts/legacy_distance_4_2.py`.
+Metre üretmez.
 
 ---
 
 ## 📤 Çıktı
 
-Konsolda yön dağılımı özeti yazdırılır:
+| Dosya | İçerik |
+|:---|:---|
+| `Result/<ad>.mp4` | Asıl teslim: H.264, kaynak FPS, iz + HUD + minimap |
+| `Result/<ad>/annotated.mp4` | Aynı video, koşu klasöründe |
+| `Result/<ad>/trajectory.json` | Adım adım R, t, metre, atlanan kareler |
+| `Result/<ad>/plot.png` | Üstten yörünge + yükseklik (yukarıdaki gibi) |
+| `Result/<ad>/preview.png` | Ortadaki kareden still (yukarıdaki gibi) |
+| `Result/<ad>/frames/` | Ara bellek PNG — çıktı değil |
+| `Result/<ad>/depth_cache/` | Derinlik `.npy` önbelleği |
 
-```
-📊 Hareket İstatistikleri:
-     İLERİ:  12 frame ( 5.6%)
-      GERİ:  18 frame ( 8.5%)
-      SAĞA:  32 frame (15.0%)
-      SOLA:   5 frame ( 2.3%)
-    YUKARI:   2 frame ( 0.9%)
-     AŞAĞI:   6 frame ( 2.8%)
-  BELİRSİZ: 138 frame (64.8%)
-```
-
-<sub>Yukarıdaki değerler örnek bir çalıştırmadandır. Yüksek **BELİRSİZ** oranının nedeni
-aşağıda açıklanıyor.</sub>
-
-**Referans çalıştırma:** 1440×1440 @ 30 fps, ~7 saniye, 207 kare.
+**Referans koşu (V1):** 3840×2160 @ 60 fps, ~35 sn, 2112 kare, `--max-edge 768`.
+234 adım, 0 atlama. Örnek: odometre ileri +1.64 m, yol 28.98 m, net 1.91 m
+(ileri/geri/sol/sağ çekimi — yol > net beklenir). Şeritmetre / TUM ile henüz doğrulanmadı.
 
 ---
 
@@ -224,58 +173,53 @@ aşağıda açıklanıyor.</sub>
 
 | Bileşen | Değer |
 |:---|:---|
-| Derinlik modeli | `depth-anything/Depth-Anything-V2-base-hf` |
-| Framework | PyTorch + 🤗 Transformers (`pipeline("depth-estimation")`) |
-| Cihaz seçimi | `accelerate.get_backend()` ile otomatik (CUDA / MPS / CPU) |
-| Video I/O | OpenCV (`cv2.VideoCapture` / `VideoWriter`) |
-| Grid | 3×3 (9 bölge), bölge özeti = aritmetik ortalama |
-| Kare karşılaştırma aralığı | 5 kare |
-| Eşik değeri `τ` | 0.01 |
-| Denenen codec'ler | H264, XVID, MP4V, MJPG (ilk çalışan seçilir) |
+| Derinlik | `Depth-Anything-V2-Metric-Indoor-Large-hf` (varsayılan) |
+| Poz | ORB + `solvePnPRansac` + refine |
+| Görselleştirme izi | Shi-Tomasi + Lucas-Kanade, noktaya özel renk |
+| Video yazımı | ffmpeg `libx264` `yuv420p` (OpenCV `mp4v` FPS’i bozuyordu) |
+| Minimap | Yeşil–kırmızı mesafe; geri dönüşte görüş donar; kenar payı %8 |
+| Kamera ekseni | OpenCV: `+x` sağ, `+y` aşağı, `+z` ileri |
 
 ---
 
 ## ⚠️ Bilinen Sınırlamalar
 
-Bu bir **araştırma prototipidir**. Şeffaflık için bilinen zayıf noktalar:
+Bu bir **araştırma prototipidir** (V1).
 
 | # | Sınırlama | Neden / Etki |
 |:--|:---|:---|
-| 1 | **Yüksek BELİRSİZ oranı** | İLERİ/GERİ kuralı **9 bölgenin tamamının** aynı yönde değişmesini şart koşar. Tek bir aykırı bölge bile kuralı düşürür. |
-| 2 | **Göreli (relative) derinlik** | Depth Anything V2 metrik değil, ölçek ve kayması kareden kareye değişebilen *affine-invariant* derinlik üretir. Kareler arası mutlak fark bu yüzden gürültülüdür — sinyalin bir kısmı gerçek hareket değil, ölçek kaymasıdır. |
-| 3 | **Dönme tespiti yok** | Yalnızca 3 eksende öteleme sınıflandırılır; pan / tilt / roll ölçülmez. |
-| 4 | **Yön var, büyüklük yok** | Çıktı kategorik bir etikettir; hız veya kat edilen mesafe üretilmez. |
-| 5 | **Gereksiz hesap** | Döngü her adımda `kare[i]` ve `kare[i+5]` için ayrı ayrı çıkarım yapar; böylece neredeyse her kare **iki kez** modele girer. Derinlik haritalarını önbelleğe almak süreyi ~2× kısaltır. |
-| 6 | **Sabit kodlanmış yollar** | Yollar script içinde tanımlı; henüz CLI argümanı yok. |
-| 7 | **Ekrandaki sayaçlar statik** | Sol alttaki dağılım, analiz bittikten sonra hesaplanan **nihai toplamlardır**; her karede aynı değerleri gösterir (kümülatif ilerlemeyi değil). |
-| 8 | **Kare hizalaması** | Etiket, `kare[i] → kare[i+5]` aralığını tanımlar ama karenin *kendisine* yazılır; ayrıca çıkarılan JPG sayısı ile video kare sayısı birebir olmayabilir. |
+| 1 | **Ölçek modelden gelir** | Monoküler geometri mutlak metre veremez; Indoor checkpoint yanlı olabilir. TUM / şeritmetre henüz yok. |
+| 2 | **`K` kaba** | Kalibrasyon yoksa yatay FOV 70° varsayılır. Yanlış `K` tüm metreyi çarpar. |
+| 3 | **Dönme etiketi yok** | Poz 6-DoF çözülür; HUD yalnızca öteleme yönünü yazar. |
+| 4 | **Keyframe yok** | Sabit zaman aralığı (`--interval`). Çok yavaş/hızlı harekette eşleme zayıflar. |
+| 5 | **Sağlamlık kapıları eksik** | Essential-matrix çapraz kontrolü ve hız kapısı Faz 2. |
+| 6 | **Çözünürlük** | `--max-edge` küçültmesi görseli ve `K`’yı değiştirir. |
 
 ---
 
 ## 🗺️ Yol Haritası
 
-- [ ] Yeni, kontrollü demo çekimi + README'ye demo GIF
-- [ ] Derinlik haritası önbelleği (~2× hızlanma)
-- [ ] `argparse` ile CLI arayüzü
-- [ ] Kare başına ölçek/kayma normalizasyonu (madde 2'yi azaltmak için)
-- [ ] Yumuşatılmış karar mekanizması (katı `all()` yerine oy / skor tabanlı)
-- [ ] Dönme (pan / tilt / roll) tespiti
-- [ ] Etiketlenmiş referans video ile nicel doğruluk ölçümü
+- [x] Metrik derinlik + PnP VO + `trajectory.json`
+- [x] CLI, Data/Result ayrımı, H.264 annotate, minimap
+- [ ] TUM RGB-D ATE/RPE + ölçek yanlılığı
+- [ ] Paralaks keyframe + sağlamlık kapıları
+- [ ] Dönme (pan / tilt / roll) HUD
+- [ ] Kontrollü şeritmetre çekimi (%10 hedef)
 
 ---
 
 ## 🧭 Projenin Evrimi
 
-Sonuçtaki yaklaşım, dört ayrı denemenin ardından ortaya çıktı:
-
-| Deneme | Yaklaşım | Neden yetersiz kaldı |
+| Deneme | Yaklaşım | Sonuç |
 |:--|:---|:---|
-| **1** | Lucas-Kanade optik akış + grid tabanlı nokta takibi (Gradio arayüzü, V1→V3) | 2B piksel kayması, kamera hareketini sahne hareketinden ayırt edemedi |
-| **2** | `KameraHareketTespiti` sınıfı: 6 yön + zoom, kümülatif referans değerler, JSON çıktı | Hâlâ optik akış tabanlı; eşikler sahneye aşırı duyarlıydı |
-| **3** | Kareleri JPG olarak dışa aktarma + ardışık kare analizi | Analiz altyapısı hazırlandı, yöntem değişmedi |
-| **4** | **Depth Anything V2'ye geçiş.** İlk olarak 2 yön (İleri/Geri), sonra 3×3 bölgesel analiz ile 6 yön + videoya gömme | ✅ Mevcut yaklaşım |
+| **1** | Lucas-Kanade + grid (Gradio) | Kamera vs nesne ayrımı yok |
+| **2** | 6 yön + zoom, kümülatif eşikler | Sahneye aşırı duyarlı |
+| **3** | JPG kare dışa aktarma | Yöntem değişmedi |
+| **4** | Göreli Depth Anything + 3×3 bölge farkı | Yön etiketi var, metre yok, ~%65 BELİRSİZ |
+| **5 (V1)** | **Metrik derinlik + PnP görsel odometri** | Metre + yörünge + annotate video |
 
-Kilit içgörü: **2B hareketi tahmin etmeye çalışmak yerine 3B yapıyı çıkarıp onun değişimine bakmak.**
+Kilit içgörü aynı: **2B kaymayı sınıf etiketine çevirmek yerine 3B yapıyı ölçmek.**
+V1 bunu geometrik poza bağlar.
 
 ---
 
@@ -283,25 +227,26 @@ Kilit içgörü: **2B hareketi tahmin etmeye çalışmak yerine 3B yapıyı çı
 
 ```
 Depth-Based-Camera-Motion-Analyzer/
-├── Data/                                # ham videolar (repoya girmez)
-├── Result/                              # işlenmiş çıktılar (repoya girmez)
+├── Data/                     # ham videolar (repoya girmez)
+├── Result/                   # işlenmiş çıktılar (repoya girmez)
 ├── Scripts/
-│   ├── legacy_distance_4_2.py           # eski sezgisel yöntem (tarihsel)
-│   └── make_demo_gif.sh                 # çıktı videosundan README GIF'i üretir
-├── src/dcma/                            # yeni metrik VO paketi
+│   ├── legacy_distance_4_2.py
+│   └── make_demo_gif.sh
+├── src/dcma/                 # metrik VO + görselleştirme
 ├── tests/
 ├── docs/
-├── assets/                              # README görselleri (demo GIF buraya)
+├── assets/
+│   ├── preview.png           # README: annotate karesi
+│   └── plot.png              # README: yörünge özeti
 ├── README.md
-├── requirements.txt
-└── .gitignore
+├── pyproject.toml
+└── requirements.txt
 ```
 
-> 📦 Ham videolar ve çıkarılmış kareler `.gitignore` ile hariç tutulmuştur
-> (GitHub'ın 100 MB dosya limitini aşıyorlar).
+> 📦 Ham video ve koşu çıktıları `.gitignore`’da. README görselleri `assets/` istisnası.
 
 ---
 
 <div align="center">
-<sub>Bilgisayarla görü / monoküler derinlik tahmini üzerine bir araştırma çalışması.</sub>
+<sub>Bilgisayarla görü / monoküler metrik görsel odometri üzerine bir araştırma çalışması. V1.</sub>
 </div>
