@@ -134,25 +134,54 @@ Model ilk çalıştırmada Hugging Face'den otomatik indirilir (~200 MB, base ch
 
 ## 🧪 Kullanım
 
-### 1. Video karelerini çıkar
+Ham videolar `Data/`, işlenmiş çıktılar `Result/` altına gider.
+
+### Yeni sistem (metrik 6-DoF)
+
+`dcma` conda ortamında, repo kökünden:
+
+```bash
+export DPY=/path/to/envs/dcma/bin/python
+
+env -u VIRTUAL_ENV PYTHONNOUSERSITE=1 PYTHONPATH=src $DPY -m dcma.cli \
+  --video "Data/girdi.mp4" \
+  --out "Result/calisma_adi" \
+  --scene indoor \
+  --size large \
+  --interval 0.15 \
+  --max-edge 768
+```
+
+Çıktı: `trajectory.json`, `annotated.mp4` (ORB noktaları + kümülatif metre + mini yörünge), `plot.png`.
+
+Yalnızca görsel üretmek (derinlik tekrar çalışmaz):
+
+```bash
+env -u VIRTUAL_ENV PYTHONNOUSERSITE=1 PYTHONPATH=src $DPY -m dcma.viz.annotate \
+  --run Result/calisma_adi
+```
+
+### Eski sistem (kategorik yön etiketi)
+
+#### 1. Video karelerini çıkar
 
 ```bash
 mkdir -p Video_Frames
-ffmpeg -i girdi.mp4 Video_Frames/Frame_%04d.jpg
+ffmpeg -i Data/girdi.mp4 Video_Frames/Frame_%04d.jpg
 ```
 
-### 2. Yolları ayarla
+#### 2. Yolları ayarla
 
 [`Scripts/legacy_distance_4_2.py`](Scripts/legacy_distance_4_2.py) içindeki üç
 değişkeni kendi ortamınıza göre düzenleyin:
 
 ```python
-video_path        = "/yol/girdi.mp4"            # annotate edilecek orijinal video
-frames_path       = "/yol/Video_Frames"         # çıkarılmış JPG kareler
-output_video_path = "/yol/out/annotated.mp4"    # üretilecek video
+video_path        = "Data/girdi.mp4"            # annotate edilecek orijinal video
+frames_path       = "Video_Frames"              # çıkarılmış JPG kareler
+output_video_path = "Result/annotated.mp4"      # üretilecek video
 ```
 
-### 3. Çalıştır
+#### 3. Çalıştır
 
 ```bash
 python Scripts/legacy_distance_4_2.py
@@ -161,10 +190,10 @@ python Scripts/legacy_distance_4_2.py
 Script sırayla: kareleri yükler → her kare çifti için derinlik tahmini yapar →
 yön analizini uygular → annotate edilmiş videoyu yazar → çıktıyı doğrular.
 
-### 4. (İsteğe bağlı) README için demo GIF üret
+#### 4. (İsteğe bağlı) README için demo GIF üret
 
 ```bash
-./Scripts/make_demo_gif.sh out/annotated.mp4 assets/demo.gif 12 640
+./Scripts/make_demo_gif.sh Result/annotated.mp4 assets/demo.gif 12 640
 ```
 
 ---
@@ -254,13 +283,18 @@ Kilit içgörü: **2B hareketi tahmin etmeye çalışmak yerine 3B yapıyı çı
 
 ```
 Depth-Based-Camera-Motion-Analyzer/
+├── Data/                                # ham videolar (repoya girmez)
+├── Result/                              # işlenmiş çıktılar (repoya girmez)
+├── Scripts/
+│   ├── legacy_distance_4_2.py           # eski sezgisel yöntem (tarihsel)
+│   └── make_demo_gif.sh                 # çıktı videosundan README GIF'i üretir
+├── src/dcma/                            # yeni metrik VO paketi
+├── tests/
+├── docs/
+├── assets/                              # README görselleri (demo GIF buraya)
 ├── README.md
 ├── requirements.txt
-├── .gitignore
-├── assets/                              # README görselleri (demo GIF buraya)
-└── Scripts/
-    ├── legacy_distance_4_2.py           # eski sezgisel yöntem (tarihsel)
-    └── make_demo_gif.sh                 # Çıktı videosundan README GIF'i üretir
+└── .gitignore
 ```
 
 > 📦 Ham videolar ve çıkarılmış kareler `.gitignore` ile hariç tutulmuştur

@@ -1,5 +1,6 @@
 # --- Ham / ağır medya (GitHub 100 MB dosya limitini aşar) ---
-Data/
+Data/**
+!Data/.gitkeep
 *.mp4
 *.avi
 *.mov
@@ -8,6 +9,10 @@ Data/
 !assets/*.gif
 !assets/*.png
 !assets/*.jpg
+
+# --- İşlenmiş çıktılar (kareler, derinlik önbelleği, yörünge) ---
+Result/**
+!Result/.gitkeep
 
 # --- Çıkarılmış video kareleri ---
 Video_Frames/
