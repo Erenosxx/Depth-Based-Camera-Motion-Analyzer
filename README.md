@@ -20,13 +20,13 @@ ve sonuç annotate videoya, grafiklere yazılır.
 
 ## 🎬 Demo
 
-İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin işlenmiş karesi ve yörünge özeti:
+İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin annotate özeti (5× hız, 8 fps, 56 kare) ve yörünge grafiği:
 
 <div align="center">
-<img src="assets/preview.png" width="360" alt="Annotate video karesi: renkli izler, HUD ve minimap">
+<img src="assets/demo.gif" width="360" alt="Annotate video GIF: renkli izler, HUD ve minimap, tüm çekim">
 </div>
 
-**`preview.png` — annotate videodan tek kare.** Ne görünüyor:
+**`demo.gif` — tüm çekim, seyrek karelerle.** Ne görünüyor:
 
 | Bölge | Anlamı |
 |:---|:---|
@@ -159,7 +159,7 @@ Metre üretmez.
 | `Result/<ad>/annotated.mp4` | Aynı video, koşu klasöründe |
 | `Result/<ad>/trajectory.json` | Adım adım R, t, metre, atlanan kareler |
 | `Result/<ad>/plot.png` | Üstten yörünge + yükseklik (yukarıdaki gibi) |
-| `Result/<ad>/preview.png` | Ortadaki kareden still (yukarıdaki gibi) |
+| `Result/<ad>/preview.png` | Ortadaki kareden still (yerel; README’de GIF kullanılır) |
 | `Result/<ad>/frames/` | Ara bellek PNG — çıktı değil |
 | `Result/<ad>/depth_cache/` | Derinlik `.npy` önbelleği |
 
@@ -236,7 +236,7 @@ Depth-Based-Camera-Motion-Analyzer/
 ├── tests/
 ├── docs/
 ├── assets/
-│   ├── preview.png           # README: annotate karesi
+│   ├── demo.gif              # README: tüm çekimin annotate GIF’i
 │   └── plot.png              # README: yörünge özeti
 ├── README.md
 ├── pyproject.toml
