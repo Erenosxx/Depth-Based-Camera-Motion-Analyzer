@@ -20,7 +20,7 @@ ve sonuç annotate videoya, grafiklere yazılır.
 
 ## 🎬 Demo
 
-İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin annotate özeti (6× hız, 6 fps, 35 kare) ve yörünge grafiği:
+İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin annotate özeti (3× hız, 5 fps, 59 kare) ve yörünge grafiği:
 
 <div align="center">
 
