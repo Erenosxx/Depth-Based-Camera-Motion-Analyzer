@@ -14,9 +14,10 @@ from dcma.calib.intrinsics import Intrinsics
 from dcma.depth.depth_anything import DepthAnythingMetric
 from dcma.video.normalize import normalize_video, probe_video
 from dcma.vo.features import detect_and_match
-from dcma.vo.pose import backproject, estimate_pose
+from dcma.vo.pose import backproject, estimate_pose, maybe_inplace_yaw
 from dcma.vo.trajectory import Trajectory
 from dcma.viz.annotate import write_outputs
+from dcma.map.occupancy import OccupancyGrid
 
 # Gecerli derinlik araliklari sahneye gore degisir: ic mekan modeli ~20 m'ye,
 # dis mekan modeli ~80 m'ye kadar egitildi. Araligin disi guvenilmez.
@@ -65,10 +66,12 @@ def run(args: argparse.Namespace) -> dict:
 
     backend = DepthAnythingMetric(scene=args.scene, size=args.size,
                                   device=args.device,
-                                  cache_dir=out_dir / "depth_cache")
+                                  cache_dir=out_dir / "depth_cache",
+                                  lazy=True)
     min_depth, max_depth = DEPTH_RANGE_M[args.scene]
     traj = Trajectory()
     skipped: list[dict] = []
+    occ = OccupancyGrid(min_depth=min_depth, max_depth=max_depth)
 
     for i in range(0, len(frames) - stride, stride):
         j = i + stride
@@ -95,7 +98,9 @@ def run(args: argparse.Namespace) -> dict:
             skipped.append({"from": i, "to": j, "reason": "PnP çözülemedi"})
             continue
 
-        traj.add_step(res.R, res.t, inliers=res.inliers,
+        R, t = maybe_inplace_yaw(res.R, res.t)
+        occ.splat(depth_i, K, traj.poses[-1], frame_idx=i)
+        traj.add_step(R, t, inliers=res.inliers,
                       reproj_err=res.reproj_err, frame_from=i, frame_to=j)
 
     payload = traj.to_dict()
@@ -103,6 +108,8 @@ def run(args: argparse.Namespace) -> dict:
     payload["manifest"] = manifest.to_dict()
     (out_dir / "trajectory.json").write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    occ.to_npz(out_dir / "occupancy.npz")
+    occ.write_png(out_dir / "occupancy.png")
 
     odo = payload["odometer"]
     net = payload["net_displacement"]

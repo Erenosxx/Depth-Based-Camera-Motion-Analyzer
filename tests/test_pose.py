@@ -89,6 +89,24 @@ def test_backproject_inverts_projection():
     np.testing.assert_allclose(P3d, X, atol=1e-2)
 
 
+def test_yaw_dominant_relative_pose_drops_translation():
+    """Yerinde dönüş (~15°/adım) yürüyüş ötelemesi sanılmasın."""
+    from dcma.vo.pose import maybe_inplace_yaw
+    R = cv2.Rodrigues(np.array([0.0, np.deg2rad(-15.0), 0.0]))[0]
+    t = np.array([0.05, -0.02, -0.30])
+    Rg, tg = maybe_inplace_yaw(R, t)
+    np.testing.assert_allclose(Rg, R)
+    np.testing.assert_allclose(tg, 0.0, atol=1e-12)
+
+
+def test_small_yaw_keeps_translation():
+    from dcma.vo.pose import maybe_inplace_yaw
+    R = cv2.Rodrigues(np.array([0.0, np.deg2rad(-3.0), 0.0]))[0]
+    t = np.array([0.0, 0.0, -0.25])
+    _, tg = maybe_inplace_yaw(R, t)
+    np.testing.assert_allclose(tg, t)
+
+
 def test_too_few_points_returns_none():
     K = Intrinsics(fx=1000.0, fy=1000.0, cx=500.0, cy=500.0, width=1000, height=1000)
     res = estimate_pose(np.zeros((3, 3)), np.zeros((3, 2), dtype=np.float32), K)

@@ -2,9 +2,12 @@ import cv2
 import numpy as np
 import pytest
 
-from dcma.viz.annotate import EDGE_PAD, draw_overlay, minimap_view, write_annotated_video
+from dcma.viz.annotate import (
+    EDGE_PAD, _direction, draw_overlay, minimap_view, write_annotated_video,
+)
 from dcma.viz.plot import write_trajectory_plot
 from dcma.viz.tracks import PointTracker, color_for_id
+from dcma.map.occupancy import OccupancyGrid
 
 
 def _payload():
@@ -87,6 +90,39 @@ def test_minimap_resumes_when_farther_than_record():
     assert s == pytest.approx(s_far)
 
 
+def test_minimap_keeps_sideways_leg_on_screen():
+    """Yeşil–en uzak kirişi L kolunu ekran dışına atıyordu."""
+    path = np.array([[0.0, 0.0], [5.0, 5.0], [6.0, 0.0]])
+    center, span = minimap_view(path)
+    for pt in path:
+        n = _norm(pt, center, span)
+        assert EDGE_PAD - 1e-6 <= n[0] <= 1.0 - EDGE_PAD + 1e-6
+        assert EDGE_PAD - 1e-6 <= n[1] <= 1.0 - EDGE_PAD + 1e-6
+
+
+def test_minimap_occupancy_keeps_current_inside():
+    path = np.array([[0.0, 0.0], [0.0, 2.0]])
+    occ = np.array([[-3.0, 0.0], [3.0, 0.0], [0.0, 8.0]])
+    center, span = minimap_view(path, extras=occ)
+    n_red = _norm(path[-1], center, span)
+    assert 0.05 < n_red[0] < 0.95
+    assert 0.05 < n_red[1] < 0.95
+    n_wall = _norm(np.array([0.0, 8.0]), center, span)
+    assert EDGE_PAD - 1e-6 <= n_wall[1] <= 1.0 - EDGE_PAD + 1e-6
+
+
+def test_minimap_heading_lookahead_pulls_frontier_inward():
+    """Bakış yönünde pay: kırmızı uçta ok kesilmesin."""
+    path = np.array([[0.0, 0.0], [0.0, 4.0]])
+    c, s = minimap_view(path)
+    n0 = _norm(path[-1], c, s)
+    assert n0[1] == pytest.approx(1.0 - EDGE_PAD)
+    c2, s2 = minimap_view(path, heading_xy=np.array([0.0, 1.0]))
+    n1 = _norm(path[-1], c2, s2)
+    assert n1[1] < n0[1] - 0.03
+    assert _norm(path[0], c2, s2)[1] >= EDGE_PAD - 1e-6
+
+
 def test_ids_get_distinct_colors():
     colors = {color_for_id(i) for i in range(20)}
     assert len(colors) >= 15
@@ -124,6 +160,31 @@ def test_tracker_trail_follows_l_shape_not_diagonal():
     assert dy_last > 8
 
 
+def test_state_fills_yaw_from_poses_when_step_omits_it():
+    """Eski trajectory.json yaw_deg yazmaz; pozlardan SAĞA DÖN üretilmeli."""
+    from dcma.vo.trajectory import Trajectory
+    from dcma.viz.annotate import _state_at_frame
+
+    tr = Trajectory()
+    R = cv2.Rodrigues(np.array([0.0, np.deg2rad(-12.0), 0.0]))[0]
+    tr.add_step(R, np.zeros(3), frame_from=0, frame_to=5)
+    payload = tr.to_dict()
+    payload["steps"][0].pop("yaw_deg")
+    _, step, _, heading = _state_at_frame(payload, 3)
+    assert _direction(step) == "SAĞA DÖN"
+    assert step["yaw_deg"] == pytest.approx(-12.0, abs=1.0)
+    assert heading is not None
+    assert float(np.linalg.norm(heading)) > 0.1
+
+
+def test_direction_reports_right_turn_not_forward():
+    step = {
+        "forward": 0.20, "right": 0.0, "up": 0.0,
+        "yaw_deg": -12.0,
+    }
+    assert _direction(step) == "SAĞA DÖN"
+
+
 def test_draw_overlay_keeps_shape_and_paints_hud():
     frame = np.full((120, 160, 3), 40, dtype=np.uint8)
     out = draw_overlay(
@@ -138,6 +199,22 @@ def test_draw_overlay_keeps_shape_and_paints_hud():
     assert not np.array_equal(out, frame)
 
 
+def test_minimap_paints_occupancy_cells():
+    frame = np.full((200, 200, 3), 40, dtype=np.uint8)
+    kwargs = dict(
+        odo={"forward": 0.0, "right": 0.0, "up": 0.0},
+        step={"forward": 0.05, "right": 0.0, "up": 0.0},
+        path_xy=np.array([[0.0, 0.0], [0.0, 2.0]]),
+        frame_idx=0,
+    )
+    without = draw_overlay(frame, **kwargs)
+    with_occ = draw_overlay(
+        frame, **kwargs, occ_xy=np.array([[-0.8, 1.0], [0.8, 1.0]]),
+    )
+    assert with_occ.shape == without.shape
+    assert not np.array_equal(with_occ, without)
+
+
 def test_write_trajectory_plot_creates_png(tmp_path):
     path = tmp_path / "plot.png"
     write_trajectory_plot(_payload(), path)
@@ -146,6 +223,18 @@ def test_write_trajectory_plot_creates_png(tmp_path):
     img = cv2.imread(str(path))
     assert img is not None
     assert img.ndim == 3
+
+
+def test_write_trajectory_plot_accepts_occupancy(tmp_path):
+    from dcma.calib.intrinsics import Intrinsics
+    K = Intrinsics(fx=200.0, fy=200.0, cx=80.0, cy=60.0, width=160, height=120)
+    depth = np.full((120, 160), 4.0, dtype=np.float32)
+    occ = OccupancyGrid(resolution=0.10, stride=4, y_lo=-2.0, y_hi=2.0)
+    occ.splat(depth, K, np.eye(4), frame_idx=0)
+    path = tmp_path / "plot.png"
+    write_trajectory_plot(_payload(), path, occupancy=occ)
+    assert path.is_file()
+    assert path.stat().st_size > 1000
 
 
 def test_write_annotated_video_fps_matches_manifest(tmp_path):

@@ -8,7 +8,8 @@ from typing import Any
 import numpy as np
 
 
-def write_trajectory_plot(payload: dict[str, Any], path: str | Path) -> Path:
+def write_trajectory_plot(payload: dict[str, Any], path: str | Path,
+                          occupancy: Any | None = None) -> Path:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -24,7 +25,17 @@ def write_trajectory_plot(payload: dict[str, Any], path: str | Path) -> Path:
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
 
     ax = axes[0]
-    ax.plot(right, forward, color="#1f77b4", linewidth=1.5)
+    if occupancy is not None:
+        counts, origin = occupancy.dense()
+        res = float(occupancy.resolution)
+        hh, ww = counts.shape
+        if counts.max() > 0:
+            extent = [origin[0], origin[0] + ww * res,
+                      origin[1], origin[1] + hh * res]
+            ax.imshow(counts, origin="lower", extent=extent, cmap="gray_r",
+                      interpolation="nearest", alpha=0.85, aspect="equal",
+                      vmin=0, vmax=1, zorder=0)
+    ax.plot(right, forward, color="#1f77b4", linewidth=1.5, zorder=2)
     ax.scatter(right[0], forward[0], color="#2ca02c", s=36, zorder=3, label="başlangıç")
     ax.scatter(right[-1], forward[-1], color="#d62728", s=36, zorder=3, label="bitiş")
     ax.set_xlabel("sağa (m)")

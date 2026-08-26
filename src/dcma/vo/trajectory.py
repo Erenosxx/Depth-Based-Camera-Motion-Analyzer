@@ -12,6 +12,12 @@ from typing import Any
 import numpy as np
 
 
+def yaw_deg_from_R(R: np.ndarray) -> float:
+    """Kamera bakış yaw'ı (derece). Negatif = sağa dönüş (üstten bakışta saat yönü)."""
+    R = np.asarray(R, dtype=np.float64)
+    return float(np.rad2deg(np.arctan2(-R[0, 2], R[2, 2])))
+
+
 class Trajectory:
     def __init__(self) -> None:
         self.poses: list[np.ndarray] = [np.eye(4)]
@@ -55,12 +61,18 @@ class Trajectory:
         self.poses.append(self.poses[-1] @ np.linalg.inv(dT))
 
         C = -R.T @ t
+        yaw0 = yaw_deg_from_R(self.poses[-2][:3, :3])
+        yaw1 = yaw_deg_from_R(self.poses[-1][:3, :3])
+        yaw_delta = float(np.rad2deg(np.arctan2(
+            np.sin(np.deg2rad(yaw1 - yaw0)),
+            np.cos(np.deg2rad(yaw1 - yaw0)))))
         self._steps.append({
             "frame_from": frame_from,
             "frame_to": frame_to,
             "forward": float(C[2]),
             "right": float(C[0]),
             "up": float(-C[1]),
+            "yaw_deg": yaw_delta,
             "distance": float(np.linalg.norm(C)),
             "inliers": inliers,
             "reproj_err": reproj_err,
@@ -79,5 +91,6 @@ class Trajectory:
             },
             "path_length": self.path_length,
             "positions": self.positions.tolist(),
+            "poses": [T.tolist() for T in self.poses],
             "steps": self._steps,
         }

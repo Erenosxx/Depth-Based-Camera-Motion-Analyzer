@@ -41,3 +41,6 @@ def test_end_to_end_writes_trajectory(sample_video, ffmpeg_available, cuda_devic
     assert d["step_count"] > 0
     assert "odometer" in d
     assert all(k in d["odometer"] for k in ("forward", "right", "up"))
+    assert "poses" in d
+    assert (tmp_path / "occupancy.npz").is_file()
+    assert (tmp_path / "occupancy.png").is_file()

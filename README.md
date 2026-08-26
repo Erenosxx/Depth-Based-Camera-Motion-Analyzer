@@ -12,7 +12,7 @@ ve sonuç annotate videoya, grafiklere yazılır.
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![Transformers](https://img.shields.io/badge/🤗%20Transformers-4.40%2B-FFD21E)](https://huggingface.co/docs/transformers)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/)
-![Status](https://img.shields.io/badge/status-V1%20araştırma%20prototipi-orange)
+![Status](https://img.shields.io/badge/status-V2%20araştırma%20prototipi-orange)
 
 </div>
 
@@ -34,7 +34,7 @@ ve sonuç annotate videoya, grafiklere yazılır.
 |:---|:---|
 | **Renkli noktalar + kuyruk** | Her nokta ayrı bir özellik; rengi sabittir. Arkada kalan çizgi o noktanın **ekrandaki gerçek yoludur** (kare-kare Lucas-Kanade), iki uç arasında çekilmiş düz kiriş değildir. |
 | **Sol üst yazılar** | Kare numarası ve o ana kadar biriken metre: `ileri` / `saga` / `yukari`. |
-| **Sol alt kare (minimap)** | Kuş bakışı yörünge. **Yeşil** = çekimin başlangıcı, **kırmızı** = kameranın şu anki yeri, beyaz çizgi = o ana kadar gidilen yol. Kamera yeşil–kırmızı mesafesine göre kayar; mesafe azalınca (geri dönüş) görüş donar. Noktalar kenara yakın durur, değmez. |
+| **Sol alt kare (minimap)** | Kuş bakışı yörünge + **gri occupancy** (kabaca duvar). **Yeşil** = çekimin başlangıcı, **kırmızı** = kameranın şu anki yeri, beyaz/renkli çizgi = gidilen yol. Duvar hücreleri o ana kadar birikir. Kamera yeşil–kırmızı mesafesine göre kayar; mesafe azalınca (geri dönüş) görüş donar. |
 | **Sağ alt etiket** | O anki baskın öteleme yönü: İLERİ, GERİ, SAĞA, SOLA, YUKARI, AŞAĞI veya DURAGAN. |
 
 <div align="center">
@@ -45,11 +45,11 @@ ve sonuç annotate videoya, grafiklere yazılır.
 
 | Panel | Anlamı |
 |:---|:---|
-| **Üstten görünüm** (sol) | Dünya düzlemi: yatay eksen **sağa (m)**, dikey eksen **ileri (m)**. Yeşil nokta başlangıç, kırmızı nokta bitiş. Çizgi kameranın yerde bıraktığı izdir. |
+| **Üstten görünüm** (sol) | Dünya düzlemi: yatay **sağa (m)**, dikey **ileri (m)**. Gri ızgara kabaca duvar; yeşil başlangıç, kırmızı bitiş, çizgi yol. |
 | **Yükseklik profili** (sağ) | Adım adım **yukarı (m)**. El kamerasının salınımı ve kat çıkışı burada okunur. |
 | **Başlık** | `net` = başlangıç–bitiş kuş uçuşu mesafe. `yol` = odometre (gidilen toplam yol). Gidip dönünce yol büyür, net küçük kalır — bu beklenen ayrım. |
 
-Asıl teslim dosyası `Result/<ad>.mp4` (H.264, kaynak FPS). `Result/<ad>/frames/` ham kare önbelleğidir; çıktı değildir.
+Asıl teslim dosyası `Result/<ad>/<ad>.mp4` (H.264, kaynak FPS). `Result/<ad>/frames/` ham kare önbelleğidir; çıktı değildir.
 
 ---
 
@@ -88,15 +88,16 @@ video (her format)
    → normalize     PNG kare + manifest (dönme uygulanır, K güncellenir)
    → metrik derinlik   Depth-Anything V2 Indoor/Outdoor (önbellekli, metre)
    → ORB eşleme → geri izdüşüm → PnP RANSAC → ΔT
-   → yörünge birikimi
-   → trajectory.json + plot.png + annotated.mp4 (H.264)
+   → yörünge birikimi + occupancy (kuş bakışı duvar ızgarası)
+   → trajectory.json + occupancy.npz + plot.png + annotated.mp4 (H.264)
 ```
 
 1. **Normalizasyon.** ffprobe + ffmpeg; `rotate` etiketi açıkça uygulanır. Kareler kayıpsız PNG.
 2. **Metrik derinlik.** Varsayılan `Indoor-Large`. Her kare modele bir kez girer; sonuç disk önbelleğinde.
 3. **Poz.** Kaynak karenin 3B noktaları + hedef karenin 2B eşleşmeleri → `solvePnPRansac`.
 4. **Birikim.** Odometre (adımların toplamı) ile net yer değiştirme (başlangıç–bitiş) ayrı tutulur.
-5. **Görselleştirme.** Yön HUD’u yörüngeden; nokta izleri ise kare-kare Lucas-Kanade’den (VO’dan bağımsız).
+5. **Görselleştirme.** Yön HUD’u yörüngeden; nokta izleri Lucas-Kanade; minimap’te o ana kadar biriken occupancy.
+6. **Occupancy.** Her keyframe derinliği `T_wc` ile dünya xz’ye (sağa, ileri) basılır; 10 cm hücre, kamera-yüksekliği dilimi. Döngü kapatma yok.
 
 ---
 
@@ -176,10 +177,12 @@ Metre üretmez.
 
 | Dosya | İçerik |
 |:---|:---|
-| `Result/<ad>.mp4` | Asıl teslim: H.264, kaynak FPS, iz + HUD + minimap |
+| `Result/<ad>/<ad>.mp4` | Asıl teslim: H.264, kaynak FPS, iz + HUD + minimap |
 | `Result/<ad>/annotated.mp4` | Aynı video, koşu klasöründe |
-| `Result/<ad>/trajectory.json` | Adım adım R, t, metre, atlanan kareler |
-| `Result/<ad>/plot.png` | Üstten yörünge + yükseklik (yukarıdaki gibi) |
+| `Result/<ad>/trajectory.json` | Adım adım metre, atlanan kareler, `poses` (4×4 `T_wc`) |
+| `Result/<ad>/plot.png` | Üstten yörünge + occupancy + yükseklik |
+| `Result/<ad>/occupancy.npz` | Kabaca duvar ızgarası (hit’ler + kare indeksi) |
+| `Result/<ad>/occupancy.png` | Aynı haritanın kuş bakışı görüntüsü |
 | `Result/<ad>/preview.png` | Ortadaki kareden still (yerel; README’de GIF kullanılır) |
 | `Result/<ad>/frames/` | Ara bellek PNG — çıktı değil |
 | `Result/<ad>/depth_cache/` | Derinlik `.npy` önbelleği |
@@ -198,23 +201,25 @@ Metre üretmez.
 | Poz | ORB + `solvePnPRansac` + refine |
 | Görselleştirme izi | Shi-Tomasi + Lucas-Kanade, noktaya özel renk |
 | Video yazımı | ffmpeg `libx264` `yuv420p` (OpenCV `mp4v` FPS’i bozuyordu) |
-| Minimap | Yeşil–kırmızı mesafe; geri dönüşte görüş donar; kenar payı %8 |
-| Kamera ekseni | OpenCV: `+x` sağ, `+y` aşağı, `+z` ileri |
+| Minimap | Tüm yol + occupancy AABB; geri dönüşte görüş donar; kenar payı %8; kırmızı noktada bakış oku |
+| Occupancy | 10 cm xz ızgarası, kamera-yüksekliği dilimi, döngü kapatma yok |
+| Kamera ekseni | OpenCV: `+x` sağ, `+y` aşağı, `+z` ileri; HUD `yaw_deg<0` → SAĞA DÖN |
 
 ---
 
 ## ⚠️ Bilinen Sınırlamalar
 
-Bu bir **araştırma prototipidir** (V1).
+Bu bir **araştırma prototipidir** (V2).
 
 | # | Sınırlama | Neden / Etki |
 |:--|:---|:---|
 | 1 | **Ölçek modelden gelir** | Monoküler geometri mutlak metre veremez; Indoor checkpoint yanlı olabilir. TUM / şeritmetre henüz yok. |
 | 2 | **`K` kaba** | Kalibrasyon yoksa yatay FOV 70° varsayılır. Yanlış `K` tüm metreyi çarpar. |
-| 3 | **Dönme etiketi yok** | Poz 6-DoF çözülür; HUD yalnızca öteleme yönünü yazar. |
+| 3 | **Yerinde dönüş** | HUD `SAĞA DÖN` / `SOLA DÖN` + bakış oku. `\|yaw\|≥8°` adımında öteleme atılır (cam sapmasını keser; yürüyerek keskin viraj o adımda mesafeyi kaybeder). Minimap AABB kırmızıyı çerçevede tutar. Döngü kapatma yok. |
 | 4 | **Keyframe yok** | Sabit zaman aralığı (`--interval`). Çok yavaş/hızlı harekette eşleme zayıflar. |
-| 5 | **Sağlamlık kapıları eksik** | Essential-matrix çapraz kontrolü ve hız kapısı Faz 2. |
+| 5 | **Sağlamlık kapıları eksik** | Essential-matrix çapraz kontrolü ve hız kapısı henüz yok. |
 | 6 | **Çözünürlük** | `--max-edge` küçültmesi görseli ve `K`’yı değiştirir. |
+| 7 | **Harita kroki, CAD değil** | Occupancy Depth-Anything + PnP drift’e bağlı. Döngü kapatma yok: geri dönünce duvarlar kayabilir. Masa/kapı da “duvar” hücresi olabilir. |
 
 ---
 
@@ -222,9 +227,10 @@ Bu bir **araştırma prototipidir** (V1).
 
 - [x] Metrik derinlik + PnP VO + `trajectory.json`
 - [x] CLI, Data/Result ayrımı, H.264 annotate, minimap
+- [x] Kabaca duvar occupancy (minimap + plot + occupancy.npz)
 - [ ] TUM RGB-D ATE/RPE + ölçek yanlılığı
 - [ ] Paralaks keyframe + sağlamlık kapıları
-- [ ] Dönme (pan / tilt / roll) HUD
+- [x] Dönme (pan) HUD + minimap bakış oku
 - [ ] Kontrollü şeritmetre çekimi (%10 hedef)
 
 ---
@@ -238,9 +244,10 @@ Bu bir **araştırma prototipidir** (V1).
 | **3** | JPG kare dışa aktarma | Yöntem değişmedi |
 | **4** | Göreli Depth Anything + 3×3 bölge farkı | Yön etiketi var, metre yok, ~%65 BELİRSİZ |
 | **5 (V1)** | **Metrik derinlik + PnP görsel odometri** | Metre + yörünge + annotate video |
+| **6 (V2)** | **Occupancy ızgarası (kuş bakışı duvar)** | Minimap/plot’ta kabaca duvar; döngü kapatma yok |
 
 Kilit içgörü aynı: **2B kaymayı sınıf etiketine çevirmek yerine 3B yapıyı ölçmek.**
-V1 bunu geometrik poza bağlar.
+V2 bunu kaba bir kat planına da bağlar.
 
 ---
 
@@ -254,7 +261,7 @@ Depth-Based-Camera-Motion-Analyzer/
 │   ├── dcma.sh               # local.env'deki yorumlayıcıyla çalıştırır
 │   ├── legacy_distance_4_2.py
 │   └── make_demo_gif.sh
-├── src/dcma/                 # metrik VO + görselleştirme
+├── src/dcma/                 # metrik VO + görselleştirme + occupancy
 ├── tests/
 ├── docs/
 ├── assets/
@@ -271,5 +278,5 @@ Depth-Based-Camera-Motion-Analyzer/
 ---
 
 <div align="center">
-<sub>Bilgisayarla görü / monoküler metrik görsel odometri üzerine bir araştırma çalışması. V1.</sub>
+<sub>Bilgisayarla görü / monoküler metrik görsel odometri üzerine bir araştırma çalışması. V2.</sub>
 </div>

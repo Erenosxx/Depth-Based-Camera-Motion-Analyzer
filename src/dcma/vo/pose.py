@@ -17,6 +17,18 @@ import numpy as np
 from dcma.calib.intrinsics import Intrinsics
 
 MIN_POINTS = 6
+# ~8°/0.15 s üstü bilinçli pivot; yürüyerek viraj genelde bunun altında kalır.
+YAW_INPLACE_DEG = 8.0
+
+
+def maybe_inplace_yaw(R: np.ndarray, t: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Büyük yaw adımında ötelemeyi at: derinlik yanlılığı pivotu yürüyüş yapmasın."""
+    R = np.asarray(R, dtype=np.float64)
+    t = np.asarray(t, dtype=np.float64).ravel().copy()
+    yaw = float(np.rad2deg(np.arctan2(-R[0, 2], R[2, 2])))
+    if abs(yaw) >= YAW_INPLACE_DEG:
+        return R, np.zeros(3, dtype=np.float64)
+    return R, t
 
 
 @dataclass
