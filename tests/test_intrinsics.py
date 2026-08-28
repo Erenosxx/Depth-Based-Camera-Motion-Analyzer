@@ -174,3 +174,42 @@ def test_rejects_non_finite_values(kwargs):
 def test_resized_to_rejects_nonpositive_dimensions(wh):
     with pytest.raises(ValueError):
         base().resized_to(*wh)
+
+
+def test_from_fov_long_edge_is_orientation_independent():
+    """Kamera spesifikasyonu sensörün uzun eksenine aittir; portre ve yatay
+    kaynak aynı odak uzaklığını vermelidir."""
+    land = Intrinsics.from_fov_long_edge(3840, 2176, 70.0)
+    port = Intrinsics.from_fov_long_edge(2176, 3840, 70.0)
+    assert land.fx == pytest.approx(port.fx)
+    assert land.fy == pytest.approx(port.fy)
+
+
+def test_from_fov_long_edge_on_portrait_gives_plausible_fovs():
+    """Natif portre kaynakta 70° uzun (dikey) eksene gitmeli, yatay daralmalı.
+
+    Regresyon: from_fov(2176, 3840, 70) açıyı KISA eksene uyguluyordu ve dikey
+    FOV 102° çıkıyordu — hiçbir normal kamera için mümkün değil. Bu hata
+    ofis_gezisi videosunda dönmeyi 3840/2176 = 1.765 kat şişirmişti (gerçek
+    90° dönüş -159° olarak raporlanıyordu).
+    """
+    import math
+    k = Intrinsics.from_fov_long_edge(2176, 3840, 70.0)
+    hfov = 2 * math.degrees(math.atan(k.width / 2 / k.fx))
+    vfov = 2 * math.degrees(math.atan(k.height / 2 / k.fy))
+    assert vfov == pytest.approx(70.0, abs=1e-9)
+    assert hfov == pytest.approx(43.28, abs=0.05)
+    assert hfov < 90.0 and vfov < 90.0
+
+
+def test_from_fov_long_edge_equals_from_fov_on_landscape():
+    """Genişlik uzun eksen olduğunda iki fonksiyon aynı K'yı vermeli."""
+    assert (Intrinsics.from_fov_long_edge(3840, 2160, 70.0)
+            == Intrinsics.from_fov(3840, 2160, 70.0))
+
+
+def test_from_fov_long_edge_rejects_bad_angle():
+    with pytest.raises(ValueError):
+        Intrinsics.from_fov_long_edge(100, 200, 0.0)
+    with pytest.raises(ValueError):
+        Intrinsics.from_fov_long_edge(100, 200, 180.0)

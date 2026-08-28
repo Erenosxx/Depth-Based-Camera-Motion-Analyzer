@@ -35,8 +35,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--scene", required=True, choices=["indoor", "outdoor", "auto"],
                    help="sahne türü; 'auto' Faz 5'te gelecek")
     p.add_argument("--size", default="large", choices=["base", "large"])
-    p.add_argument("--fov-x", dest="fov_x", type=float, default=70.0,
-                   help="kalibrasyon yoksa yatay görüş açısı (derece)")
+    p.add_argument("--fov-long", dest="fov_long", type=float, default=70.0,
+                   help="kalibrasyon yoksa kaynağın UZUN kenarı boyunca görüş "
+                        "açısı (derece). Kamera spesifikasyonları bu eksene "
+                        "göre verilir; portre/yatay ayrımından bağımsızdır.")
     p.add_argument("--interval", type=float, default=0.15,
                    help="kare çiftleri arası hedef süre (saniye)")
     p.add_argument("--max-frames", dest="max_frames", type=int, default=None)
@@ -50,7 +52,10 @@ def run(args: argparse.Namespace) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     info = probe_video(args.video)
-    k_source = Intrinsics.from_fov(info.width, info.height, args.fov_x)
+    # Uzun kenar konvansiyonu: natif portre kaynakta from_fov açıyı kısa
+    # eksene uygular, fx küçük çıkar, dönme ve yanal öteleme şişer.
+    k_source = Intrinsics.from_fov_long_edge(
+        info.width, info.height, args.fov_long)
     manifest = normalize_video(args.video, out_dir,
                                max_edge=args.max_edge,
                                max_frames=args.max_frames,

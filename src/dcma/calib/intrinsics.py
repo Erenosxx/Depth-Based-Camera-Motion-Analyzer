@@ -143,6 +143,32 @@ class Intrinsics:
                    cx=(width - 1) / 2.0, cy=(height - 1) / 2.0,
                    width=width, height=height)
 
+    @classmethod
+    def from_fov_long_edge(cls, width: int, height: int,
+                           fov_deg: float) -> "Intrinsics":
+        """Uzun kenar boyunca görüş açısından K. Yönden bağımsızdır.
+
+        Kamera üreticileri görüş açısını sensörün UZUN eksenine göre bildirir.
+        from_fov ise açıyı karenin GENİŞLİĞİNE uygular; bu yalnızca genişlik
+        uzun eksen olduğunda doğrudur.
+
+        Natif portre bir kaynakta (genişlik < yükseklik) from_fov açıyı KISA
+        eksene uygular. O zaman fx, uzun/kısa oranı kadar küçük çıkar ve
+        kestirilen DÖNME ile YANAL öteleme aynı oranda şişer — ileri bileşen
+        doğrudan z'den geldiği için etkilenmez. 2176x3840 bir kaynakta bu oran
+        1.765'tir ve gerçek 90° dönüşün -159° raporlanmasına yol açmıştı.
+
+        Bu fonksiyon açıyı her zaman max(width, height) eksenine uygular, yani
+        kaynağın portre ya da yatay olması sonucu değiştirmez.
+        """
+        if not 0.0 < fov_deg < 180.0:
+            raise ValueError(f"fov_deg (0,180) aralığında olmalı: {fov_deg}")
+        long_edge = max(width, height)
+        f = (long_edge / 2.0) / math.tan(math.radians(fov_deg) / 2.0)
+        return cls(fx=f, fy=f,
+                   cx=(width - 1) / 2.0, cy=(height - 1) / 2.0,
+                   width=width, height=height)
+
     def to_dict(self) -> dict:
         return asdict(self)
 

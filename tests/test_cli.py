@@ -21,7 +21,7 @@ def test_parser_defaults():
     args = build_parser().parse_args(
         ["--video", "x.mp4", "--out", "o", "--scene", "indoor"])
     assert args.size == "large"
-    assert args.fov_x == 70.0
+    assert args.fov_long == 70.0
     assert args.interval == 0.15
 
 
