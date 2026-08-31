@@ -14,11 +14,19 @@ from dcma.calib.intrinsics import Intrinsics
 from dcma.depth.depth_anything import DepthAnythingMetric
 from dcma.video.normalize import normalize_video, probe_video
 from dcma.vo.features import detect_and_match
-from dcma.vo.pose import backproject, estimate_pose, maybe_inplace_yaw
+from dcma.vo.pose import (
+    DEFAULT_YAW_SCALE,
+    backproject,
+    estimate_pose,
+    maybe_inplace_yaw,
+    maybe_lateral_strafe,
+    scale_yaw,
+)
 from dcma.vo.trajectory import Trajectory
 from dcma.viz.annotate import write_outputs
 from dcma.map.occupancy import OccupancyGrid
 from dcma.map.build import build_map
+from dcma.map.fuse import DEFAULT_UP_MAX
 
 # Gecerli derinlik araliklari sahneye gore degisir: ic mekan modeli ~20 m'ye,
 # dis mekan modeli ~80 m'ye kadar egitildi. Araligin disi guvenilmez.
@@ -51,6 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="3D harita voxel boyutu (metre)")
     p.add_argument("--map-stride", dest="map_stride", type=int, default=4,
                    help="3D harita piksel adımı")
+    p.add_argument("--yaw-scale", dest="yaw_scale", type=float,
+                   default=DEFAULT_YAW_SCALE,
+                   help="PnP yaw çarpanı (1.0 ham). Ofis L-köşesinde 0.88 varsayılan.")
+    p.add_argument("--up-max", dest="up_max", type=float, default=DEFAULT_UP_MAX,
+                   help="3D haritada tavan: dünya yukarı (m) bundan büyükse atılır "
+                        "(ilk kare göz=0; ofis tavanı ~1.1)")
     return p
 
 
@@ -111,6 +125,8 @@ def run(args: argparse.Namespace) -> dict:
             continue
 
         R, t = maybe_inplace_yaw(res.R, res.t)
+        R = scale_yaw(R, float(getattr(args, "yaw_scale", DEFAULT_YAW_SCALE)))
+        R, t = maybe_lateral_strafe(R, t)
         occ.splat(depth_i, K, traj.poses[-1], frame_idx=i)
         traj.add_step(R, t, inliers=res.inliers,
                       reproj_err=res.reproj_err, frame_from=i, frame_to=j)
@@ -138,6 +154,7 @@ def run(args: argparse.Namespace) -> dict:
             stride=int(getattr(args, "map_stride", 4)),
             min_depth=min_depth,
             max_depth=max_depth,
+            up_max=float(getattr(args, "up_max", DEFAULT_UP_MAX)),
         )
         print(f"3D harita   : {mapped['ply']}  ({mapped['n_points']} nokta)")
         print(f"3D önizleme : {mapped['preview']}")

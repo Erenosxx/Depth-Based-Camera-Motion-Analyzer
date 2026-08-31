@@ -45,8 +45,9 @@ def write_map_preview(
     ax.set_ylabel("ileri (m)")
     ax.set_zlabel("yukarı (m)")
     ax.set_title("3D harita")
+    ax.view_init(elev=18, azim=-70)
     try:
-        ax.set_box_aspect((1, 1, 0.4))
+        ax.set_box_aspect((1, 1, 0.35))
     except Exception:
         pass
 

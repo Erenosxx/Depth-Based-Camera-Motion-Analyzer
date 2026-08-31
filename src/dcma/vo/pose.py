@@ -19,15 +19,47 @@ from dcma.calib.intrinsics import Intrinsics
 MIN_POINTS = 6
 # ~8°/0.15 s üstü bilinçli pivot; yürüyerek viraj genelde bunun altında kalır.
 YAW_INPLACE_DEG = 8.0
+# PnP yaw ofis L-köşesinde ~%10–15 şişiyor; 1.0 ham.
+DEFAULT_YAW_SCALE = 0.88
+# |sağ| > |ileri|: duvara bakıp kayınca PnP'nin uydurduğu ileri bileşen.
+STRAFE_RIGHT_OVER_FORWARD = 1.0
+
+
+def yaw_deg(R: np.ndarray) -> float:
+    """Kamera yaw (derece). OpenCV Rodrigues +Y ile aynı işaret; negatif = sağa bakış."""
+    R = np.asarray(R, dtype=np.float64)
+    return float(np.rad2deg(np.arctan2(R[0, 2], R[2, 2])))
+
+
+def scale_yaw(R: np.ndarray, scale: float) -> np.ndarray:
+    """Yaw bileşenini `scale` ile küçült/büyüt; pitch/roll aynı kalır."""
+    R = np.asarray(R, dtype=np.float64)
+    yaw = np.arctan2(R[0, 2], R[2, 2])
+    delta = yaw * (float(scale) - 1.0)
+    R_delta, _ = cv2.Rodrigues(np.array([0.0, delta, 0.0], dtype=np.float64))
+    return R_delta @ R
 
 
 def maybe_inplace_yaw(R: np.ndarray, t: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Büyük yaw adımında ötelemeyi at: derinlik yanlılığı pivotu yürüyüş yapmasın."""
     R = np.asarray(R, dtype=np.float64)
     t = np.asarray(t, dtype=np.float64).ravel().copy()
-    yaw = float(np.rad2deg(np.arctan2(-R[0, 2], R[2, 2])))
-    if abs(yaw) >= YAW_INPLACE_DEG:
+    if abs(yaw_deg(R)) >= YAW_INPLACE_DEG:
         return R, np.zeros(3, dtype=np.float64)
+    return R, t
+
+
+def maybe_lateral_strafe(R: np.ndarray, t: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Küçük yaw + yan öteleme: sahte ileri bileşeni sıfırla (duvar ayağın dibine basmasın)."""
+    R = np.asarray(R, dtype=np.float64)
+    t = np.asarray(t, dtype=np.float64).ravel().copy()
+    if abs(yaw_deg(R)) >= YAW_INPLACE_DEG:
+        return R, t
+    C = -R.T @ t
+    if abs(C[0]) > STRAFE_RIGHT_OVER_FORWARD * abs(C[2]) and abs(C[0]) > 1e-9:
+        C = C.copy()
+        C[2] = 0.0
+        t = -R @ C
     return R, t
 
 

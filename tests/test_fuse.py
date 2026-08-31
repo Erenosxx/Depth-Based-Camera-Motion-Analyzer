@@ -56,3 +56,18 @@ def test_voxel_downsample_reduces_count_and_keeps_cell():
     out_xyz, out_rgb = voxel_downsample(xyz, rgb, 0.10)
     assert len(out_xyz) == 2
     assert out_xyz.shape == out_rgb.shape
+
+
+def test_drop_ceiling_removes_high_up_points():
+    from dcma.map.fuse import drop_ceiling
+    xyz = np.array([
+        [0.0, -0.2, 2.0],   # up=+0.2  (göz hizası)
+        [0.0, -2.8, 2.0],   # up=+2.8  tavan
+        [1.0,  0.8, 2.0],   # up=-0.8  yer
+    ], dtype=np.float64)
+    rgb = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=np.uint8)
+    out_xyz, out_rgb = drop_ceiling(xyz, rgb, up_max=1.8)
+    assert len(out_xyz) == 2
+    ups = -out_xyz[:, 1]
+    assert np.all(ups <= 1.8)
+    np.testing.assert_array_equal(out_rgb[0], [1, 2, 3])

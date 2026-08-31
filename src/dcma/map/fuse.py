@@ -9,6 +9,8 @@ import numpy as np
 from dcma.calib.intrinsics import Intrinsics
 
 DEFAULT_STRIDE = 4
+# İlk kare göz hizası dünya-up=0. Ofis tavanı gözün ~1.1 m üstü; 1.2 üstü kesilir.
+DEFAULT_UP_MAX = 1.2
 
 
 @dataclass
@@ -66,6 +68,18 @@ def voxel_downsample(
     return xyz[idx], rgb[idx]
 
 
+def drop_ceiling(
+    xyz: np.ndarray, rgb: np.ndarray, up_max: float = DEFAULT_UP_MAX,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Dünya yukarı = -y (OpenCV). Tavan (`up > up_max`) 3D görünümü kapatmasın."""
+    xyz = np.asarray(xyz, dtype=np.float64)
+    rgb = np.asarray(rgb, dtype=np.uint8)
+    if len(xyz) == 0:
+        return xyz.reshape(0, 3), rgb.reshape(0, 3)
+    keep = (-xyz[:, 1]) <= float(up_max)
+    return xyz[keep], rgb[keep]
+
+
 def fuse_frames(
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     K: Intrinsics,
@@ -73,6 +87,7 @@ def fuse_frames(
     min_depth: float = 0.3,
     max_depth: float = 15.0,
     voxel: float = 0.03,
+    up_max: float | None = DEFAULT_UP_MAX,
 ) -> FusedCloud:
     chunks_xyz: list[np.ndarray] = []
     chunks_rgb: list[np.ndarray] = []
@@ -89,5 +104,7 @@ def fuse_frames(
             np.zeros((0, 3), dtype=np.uint8))
     xyz = np.concatenate(chunks_xyz, axis=0)
     rgb = np.concatenate(chunks_rgb, axis=0)
+    if up_max is not None:
+        xyz, rgb = drop_ceiling(xyz, rgb, up_max=up_max)
     xyz, rgb = voxel_downsample(xyz, rgb, voxel)
     return FusedCloud(xyz=xyz, rgb=rgb)

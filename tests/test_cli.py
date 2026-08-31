@@ -24,6 +24,8 @@ def test_parser_defaults():
     assert args.fov_long == 70.0
     assert args.interval == 0.15
     assert args.no_map is False
+    assert args.yaw_scale == pytest.approx(0.88)
+    assert args.up_max == pytest.approx(1.2)
 
 
 def test_parser_no_map_flag():

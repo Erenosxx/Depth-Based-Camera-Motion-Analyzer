@@ -107,6 +107,34 @@ def test_small_yaw_keeps_translation():
     np.testing.assert_allclose(tg, t)
 
 
+def test_scale_yaw_reduces_heading_but_keeps_sign():
+    from dcma.vo.pose import scale_yaw, yaw_deg
+    R = cv2.Rodrigues(np.array([0.0, np.deg2rad(-10.0), 0.0]))[0]
+    Rs = scale_yaw(R, 0.88)
+    assert yaw_deg(Rs) == pytest.approx(-8.8, abs=0.15)
+    assert yaw_deg(Rs) / yaw_deg(R) == pytest.approx(0.88, abs=0.02)
+
+
+def test_lateral_strafe_zeros_spurious_forward():
+    """Duvara bakıp sağa kayınca ileri sapma duvarı ayağın dibine basmasın."""
+    from dcma.vo.pose import maybe_lateral_strafe
+    R = np.eye(3)
+    C = np.array([0.40, 0.0, 0.08])  # çoğunlukla sağa
+    t = -R @ C
+    Rg, tg = maybe_lateral_strafe(R, t)
+    C2 = -Rg.T @ tg
+    assert C2[2] == pytest.approx(0.0, abs=1e-12)
+    assert C2[0] == pytest.approx(0.40, abs=1e-12)
+
+
+def test_forward_walk_not_treated_as_strafe():
+    from dcma.vo.pose import maybe_lateral_strafe
+    R = np.eye(3)
+    t = np.array([0.0, 0.0, -0.25])
+    _, tg = maybe_lateral_strafe(R, t)
+    np.testing.assert_allclose(tg, t)
+
+
 def test_too_few_points_returns_none():
     K = Intrinsics(fx=1000.0, fy=1000.0, cx=500.0, cy=500.0, width=1000, height=1000)
     res = estimate_pose(np.zeros((3, 3)), np.zeros((3, 2), dtype=np.float32), K)

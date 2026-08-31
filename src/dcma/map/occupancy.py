@@ -17,7 +17,9 @@ class OccupancyGrid:
 
     def __init__(self, resolution: float = DEFAULT_RES, stride: int = DEFAULT_STRIDE,
                  y_lo: float = -0.5, y_hi: float = 0.5,
-                 min_depth: float = 0.3, max_depth: float = 15.0) -> None:
+                 min_depth: float = 0.3, max_depth: float = 15.0,
+                 near_m: float = 0.8, z_rel: float = 0.55,
+                 center_frac: float = 0.22) -> None:
         if resolution <= 0:
             raise ValueError(f"çözünürlük pozitif olmalı: {resolution}")
         self.resolution = float(resolution)
@@ -26,6 +28,9 @@ class OccupancyGrid:
         self.y_hi = float(y_hi)
         self.min_depth = float(min_depth)
         self.max_depth = float(max_depth)
+        self.near_m = float(near_m)
+        self.z_rel = float(z_rel)
+        self.center_frac = float(center_frac)
         self._frames: list[int] = []
         self._ix: list[int] = []
         self._iz: list[int] = []
@@ -48,15 +53,29 @@ class OccupancyGrid:
         z = depth[vi, ui].astype(np.float64)
         x = (u - K.cx) * z / K.fx
         y = (v - K.cy) * z / K.fy
+        # Karşı duvar (görüntü ortası) yana kayınca yolun üstüne basılmasın;
+        # koridor yan duvarları kenarda kalır.
+        off_center = np.abs(u - K.cx) >= self.center_frac * w
         valid = (
             np.isfinite(z) & np.isfinite(x) & np.isfinite(y)
             & (z > self.min_depth) & (z < self.max_depth)
             & (y >= self.y_lo) & (y <= self.y_hi)
+            & off_center
         )
+        if self.z_rel > 0 and np.any(valid):
+            med = float(np.median(z[valid]))
+            valid = valid & (z >= self.z_rel * med)
         if not np.any(valid):
             return 0
         pts = np.stack([x[valid], y[valid], z[valid], np.ones(int(valid.sum()))])
-        world = np.asarray(T_wc, dtype=np.float64) @ pts
+        T_wc = np.asarray(T_wc, dtype=np.float64)
+        world = T_wc @ pts
+        cam = T_wc[:3, 3]
+        dist_xz = np.hypot(world[0] - cam[0], world[2] - cam[2])
+        keep = dist_xz >= self.near_m
+        if not np.any(keep):
+            return 0
+        world = world[:, keep]
         ix = np.floor(world[0] / self.resolution).astype(int)
         iz = np.floor(world[2] / self.resolution).astype(int)
         n = int(ix.size)
@@ -107,6 +126,9 @@ class OccupancyGrid:
             y_hi=np.float64(self.y_hi),
             min_depth=np.float64(self.min_depth),
             max_depth=np.float64(self.max_depth),
+            near_m=np.float64(self.near_m),
+            z_rel=np.float64(self.z_rel),
+            center_frac=np.float64(self.center_frac),
             frames=np.asarray(self._frames, dtype=np.int32),
             ix=np.asarray(self._ix, dtype=np.int32),
             iz=np.asarray(self._iz, dtype=np.int32),
@@ -123,6 +145,9 @@ class OccupancyGrid:
             y_hi=float(data["y_hi"]) if "y_hi" in data.files else 0.5,
             min_depth=float(data["min_depth"]) if "min_depth" in data.files else 0.3,
             max_depth=float(data["max_depth"]) if "max_depth" in data.files else 15.0,
+            near_m=float(data["near_m"]) if "near_m" in data.files else 0.8,
+            z_rel=float(data["z_rel"]) if "z_rel" in data.files else 0.55,
+            center_frac=float(data["center_frac"]) if "center_frac" in data.files else 0.22,
         )
         grid._frames = np.asarray(data["frames"], dtype=int).tolist()
         grid._ix = np.asarray(data["ix"], dtype=int).tolist()

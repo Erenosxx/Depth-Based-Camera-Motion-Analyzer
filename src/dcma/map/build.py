@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 
 from dcma.calib.intrinsics import Intrinsics
-from dcma.map.fuse import fuse_frames
+from dcma.map.fuse import DEFAULT_UP_MAX, fuse_frames
 from dcma.map.ply import write_ply_xyz_rgb
 from dcma.map.poses import poses_from_trajectory
 from dcma.map.preview import write_map_preview
@@ -54,6 +54,7 @@ def build_map(
     stride: int = 4,
     min_depth: float = 0.3,
     max_depth: float = 15.0,
+    up_max: float | None = DEFAULT_UP_MAX,
 ) -> dict[str, Any]:
     run = Path(run)
     payload = json.loads((run / "trajectory.json").read_text(encoding="utf-8"))
@@ -82,7 +83,7 @@ def build_map(
 
     cloud = fuse_frames(
         packed, K, stride=stride, min_depth=min_depth,
-        max_depth=max_depth, voxel=voxel)
+        max_depth=max_depth, voxel=voxel, up_max=up_max)
     ply = write_ply_xyz_rgb(run / "map.ply", cloud.xyz, cloud.rgb)
     preview = write_map_preview(cloud.xyz, cloud.rgb, run / "map_preview.png")
     meta = {
@@ -90,6 +91,7 @@ def build_map(
         "stride": stride,
         "min_depth": min_depth,
         "max_depth": max_depth,
+        "up_max": up_max,
         "n_points": int(len(cloud.xyz)),
         "n_frames": len(used),
         "frames": used,
@@ -109,11 +111,12 @@ def main() -> None:
     p.add_argument("--run", required=True, help="Result/<ad> koşu dizini")
     p.add_argument("--voxel", type=float, default=0.03)
     p.add_argument("--stride", type=int, default=4)
+    p.add_argument("--up-max", dest="up_max", type=float, default=DEFAULT_UP_MAX)
     p.add_argument("--scene", choices=["indoor", "outdoor"], default="indoor")
     args = p.parse_args()
     lo, hi = DEPTH_RANGE_M[args.scene]
     out = build_map(Path(args.run), voxel=args.voxel, stride=args.stride,
-                    min_depth=lo, max_depth=hi)
+                    min_depth=lo, max_depth=hi, up_max=args.up_max)
     print(f"yazıldı {out['ply']}  nokta={out['n_points']}  önizleme={out['preview']}")
 
 

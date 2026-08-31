@@ -70,3 +70,26 @@ def test_write_png_creates_image(tmp_path):
     grid.write_png(png)
     assert png.is_file()
     assert png.stat().st_size > 500
+
+
+def test_splat_skips_points_too_close_to_camera():
+    """Kameranın hemen önündeki yakın derinlik 'duvar' olmasın (yana kayma artefaktı)."""
+    K = Intrinsics(fx=200.0, fy=200.0, cx=80.0, cy=60.0, width=160, height=120)
+    depth = np.full((K.height, K.width), 0.35, dtype=np.float32)
+    grid = OccupancyGrid(resolution=0.10, stride=4, y_lo=-0.4, y_hi=0.4,
+                         min_depth=0.3, near_m=0.8)
+    grid.splat(depth, K, np.eye(4), frame_idx=0)
+    assert len(grid.cells_upto(0)) == 0
+
+
+def test_splat_keeps_far_wall_in_front():
+    K = Intrinsics(fx=200.0, fy=200.0, cx=80.0, cy=60.0, width=160, height=120)
+    depth = np.full((K.height, K.width), 3.0, dtype=np.float32)
+    grid = OccupancyGrid(resolution=0.10, stride=4, y_lo=-0.4, y_hi=0.4,
+                         min_depth=0.3, near_m=0.8)
+    grid.splat(depth, K, np.eye(4), frame_idx=0)
+    cells = grid.cells_upto(0)
+    assert len(cells) >= 4
+    assert cells[:, 1].mean() == pytest.approx(3.0, abs=0.3)
+    # Karşı duvarın görüntü ortası atılır; hit'ler yanda kalır.
+    assert np.all(np.abs(cells[:, 0]) > 0.15)
