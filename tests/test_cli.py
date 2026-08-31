@@ -23,6 +23,13 @@ def test_parser_defaults():
     assert args.size == "large"
     assert args.fov_long == 70.0
     assert args.interval == 0.15
+    assert args.no_map is False
+
+
+def test_parser_no_map_flag():
+    args = build_parser().parse_args(
+        ["--video", "x.mp4", "--out", "o", "--scene", "indoor", "--no-map"])
+    assert args.no_map is True
 
 
 @pytest.mark.needs_video
@@ -44,3 +51,5 @@ def test_end_to_end_writes_trajectory(sample_video, ffmpeg_available, cuda_devic
     assert "poses" in d
     assert (tmp_path / "occupancy.npz").is_file()
     assert (tmp_path / "occupancy.png").is_file()
+    assert (tmp_path / "map.ply").is_file()
+    assert (tmp_path / "map_preview.png").is_file()

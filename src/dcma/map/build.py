@@ -14,6 +14,7 @@ from dcma.calib.intrinsics import Intrinsics
 from dcma.map.fuse import fuse_frames
 from dcma.map.ply import write_ply_xyz_rgb
 from dcma.map.poses import poses_from_trajectory
+from dcma.map.preview import write_map_preview
 
 DEPTH_RANGE_M = {
     "indoor": (0.3, 15.0),
@@ -83,6 +84,7 @@ def build_map(
         packed, K, stride=stride, min_depth=min_depth,
         max_depth=max_depth, voxel=voxel)
     ply = write_ply_xyz_rgb(run / "map.ply", cloud.xyz, cloud.rgb)
+    preview = write_map_preview(cloud.xyz, cloud.rgb, run / "map_preview.png")
     meta = {
         "voxel": voxel,
         "stride": stride,
@@ -98,7 +100,8 @@ def build_map(
     meta_path = run / "map_meta.json"
     meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False),
                          encoding="utf-8")
-    return {"ply": ply, "meta": meta_path, "n_points": meta["n_points"]}
+    return {"ply": ply, "meta": meta_path, "preview": preview,
+            "n_points": meta["n_points"]}
 
 
 def main() -> None:
@@ -111,7 +114,7 @@ def main() -> None:
     lo, hi = DEPTH_RANGE_M[args.scene]
     out = build_map(Path(args.run), voxel=args.voxel, stride=args.stride,
                     min_depth=lo, max_depth=hi)
-    print(f"yazıldı {out['ply']}  nokta={out['n_points']}")
+    print(f"yazıldı {out['ply']}  nokta={out['n_points']}  önizleme={out['preview']}")
 
 
 if __name__ == "__main__":

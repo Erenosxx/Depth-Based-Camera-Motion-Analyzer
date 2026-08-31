@@ -18,6 +18,7 @@ from dcma.vo.pose import backproject, estimate_pose, maybe_inplace_yaw
 from dcma.vo.trajectory import Trajectory
 from dcma.viz.annotate import write_outputs
 from dcma.map.occupancy import OccupancyGrid
+from dcma.map.build import build_map
 
 # Gecerli derinlik araliklari sahneye gore degisir: ic mekan modeli ~20 m'ye,
 # dis mekan modeli ~80 m'ye kadar egitildi. Araligin disi guvenilmez.
@@ -44,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-frames", dest="max_frames", type=int, default=None)
     p.add_argument("--max-edge", dest="max_edge", type=int, default=None)
     p.add_argument("--device", type=int, default=0)
+    p.add_argument("--no-map", dest="no_map", action="store_true",
+                   help="3D harita (map.ply) üretme")
+    p.add_argument("--voxel", type=float, default=0.03,
+                   help="3D harita voxel boyutu (metre)")
+    p.add_argument("--map-stride", dest="map_stride", type=int, default=4,
+                   help="3D harita piksel adımı")
     return p
 
 
@@ -124,6 +131,16 @@ def run(args: argparse.Namespace) -> dict:
     print(f"net      : ileri={net['forward']:+.3f} m  sağa={net['right']:+.3f} m  "
           f"yukarı={net['up']:+.3f} m  (|{net['magnitude']:.3f}| m)")
     print(f"yol uzunluğu: {payload['path_length']:.3f} m")
+    if not getattr(args, "no_map", False):
+        mapped = build_map(
+            out_dir,
+            voxel=float(getattr(args, "voxel", 0.03)),
+            stride=int(getattr(args, "map_stride", 4)),
+            min_depth=min_depth,
+            max_depth=max_depth,
+        )
+        print(f"3D harita   : {mapped['ply']}  ({mapped['n_points']} nokta)")
+        print(f"3D önizleme : {mapped['preview']}")
     write_outputs(out_dir)
     return payload
 

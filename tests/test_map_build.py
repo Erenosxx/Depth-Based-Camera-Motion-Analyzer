@@ -53,6 +53,8 @@ def test_build_map_from_run_dir(tmp_path):
     meta = json.loads(out["meta"].read_text(encoding="utf-8"))
     assert meta["n_points"] == len(xyz)
     assert meta["n_frames"] == 2
+    assert out["preview"].is_file()
+    assert out["preview"].stat().st_size > 500
 
 
 def test_build_map_resolves_ffmpeg_frame_percent_names(tmp_path):

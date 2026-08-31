@@ -90,7 +90,7 @@ video (her format)
    → ORB eşleme → geri izdüşüm → PnP RANSAC → ΔT
    → yörünge birikimi + occupancy (kuş bakışı duvar ızgarası)
    → trajectory.json + occupancy.npz + plot.png + annotated.mp4 (H.264)
-   → (V3) dcma.map.build → map.ply (renkli 3D nokta bulutu)
+   → map.ply + map_preview.png (3D nokta bulutu, aynı koşuda)
 ```
 
 1. **Normalizasyon.** ffprobe + ffmpeg; `rotate` etiketi açıkça uygulanır. Kareler kayıpsız PNG.
@@ -99,6 +99,7 @@ video (her format)
 4. **Birikim.** Odometre (adımların toplamı) ile net yer değiştirme (başlangıç–bitiş) ayrı tutulur.
 5. **Görselleştirme.** Yön HUD’u yörüngeden; nokta izleri Lucas-Kanade; minimap’te o ana kadar biriken occupancy.
 6. **Occupancy.** Her keyframe derinliği `T_wc` ile dünya xz’ye (sağa, ileri) basılır; 10 cm hücre, kamera-yüksekliği dilimi. Döngü kapatma yok.
+7. **3D harita.** Aynı derinlik + pozlar dünya xyz’ye basılır → `map.ply` ve `map_preview.png`. `--no-map` ile kapatılır.
 
 ---
 
@@ -161,17 +162,16 @@ PYTHONPATH=src python -m dcma.cli \
 ```
 
 `--scene indoor|outdoor` zorunlu (`auto` henüz yok). Konsolda odometre, net yer değiştirme
-ve atlanan kare sayısı basılır.
+ve atlanan kare sayısı basılır. Aynı komut `map.ply` + `map_preview.png` üretir
+(`--no-map` ile kapatılır).
 
-V3 — aynı koşudan 3D harita (derinlik modeli tekrar çalışmaz):
+Eski V2 `Result/` yanlış `K` taşıyabilir; 3D harita için VO’yu V3’te yeniden koşun.
+
+Yalnızca haritayı yenilemek (VO yok):
 
 ```bash
 ./Scripts/dcma.sh -m dcma.map.build --run Result/calisma_adi --voxel 0.03
 ```
-
-Çıktı `Result/calisma_adi/map.ply`. CloudCompare veya Blender’da aç.
-Eski V2 `Result/` dizini yanlış `K` ile üretilmiş olabilir (90° dönüş ~160°);
-3D harita için VO’yu **bu dalda** yeniden koşun, sonra `map.build` çalıştırın.
 
 Yalnızca görseli yenilemek (derinlik tekrar çalışmaz):
 
@@ -194,7 +194,8 @@ Metre üretmez.
 | `Result/<ad>/plot.png` | Üstten yörünge + occupancy + yükseklik |
 | `Result/<ad>/occupancy.npz` | Kabaca duvar ızgarası (hit’ler + kare indeksi) |
 | `Result/<ad>/occupancy.png` | Aynı haritanın kuş bakışı görüntüsü |
-| `Result/<ad>/map.ply` | V3: birleşik renkli nokta bulutu (dünya çerçevesi) |
+| `Result/<ad>/map.ply` | V3: birleşik renkli nokta bulutu (Blender / CloudCompare) |
+| `Result/<ad>/map_preview.png` | Aynı bulutun 3D + üstten PNG önizlemesi |
 | `Result/<ad>/map_meta.json` | voxel, kare sayısı, xyz sınırları |
 | `Result/<ad>/preview.png` | Ortadaki kareden still (yerel; README’de GIF kullanılır) |
 | `Result/<ad>/frames/` | Ara bellek PNG — çıktı değil |
@@ -216,6 +217,7 @@ Metre üretmez.
 | Video yazımı | ffmpeg `libx264` `yuv420p` (OpenCV `mp4v` FPS’i bozuyordu) |
 | Minimap | Tüm yol + occupancy AABB; geri dönüşte görüş donar; kenar payı %8; kırmızı noktada bakış oku |
 | Occupancy | 10 cm xz ızgarası, kamera-yüksekliği dilimi, döngü kapatma yok |
+| 3D harita | `map.ply` + `map_preview.png`; voxel 3 cm (varsayılan) |
 | Kamera ekseni | OpenCV: `+x` sağ, `+y` aşağı, `+z` ileri; HUD `yaw_deg<0` → SAĞA DÖN |
 
 ---
