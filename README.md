@@ -12,7 +12,7 @@ ve sonuç annotate videoya, grafiklere yazılır.
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.6-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![Transformers](https://img.shields.io/badge/🤗%20Transformers-4.40%2B-FFD21E)](https://huggingface.co/docs/transformers)
 [![OpenCV](https://img.shields.io/badge/OpenCV-4.8%2B-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/)
-![Status](https://img.shields.io/badge/status-V2%20araştırma%20prototipi-orange)
+![Status](https://img.shields.io/badge/status-V3%20araştırma%20prototipi-orange)
 
 </div>
 
@@ -90,6 +90,7 @@ video (her format)
    → ORB eşleme → geri izdüşüm → PnP RANSAC → ΔT
    → yörünge birikimi + occupancy (kuş bakışı duvar ızgarası)
    → trajectory.json + occupancy.npz + plot.png + annotated.mp4 (H.264)
+   → (V3) dcma.map.build → map.ply (renkli 3D nokta bulutu)
 ```
 
 1. **Normalizasyon.** ffprobe + ffmpeg; `rotate` etiketi açıkça uygulanır. Kareler kayıpsız PNG.
@@ -162,6 +163,16 @@ PYTHONPATH=src python -m dcma.cli \
 `--scene indoor|outdoor` zorunlu (`auto` henüz yok). Konsolda odometre, net yer değiştirme
 ve atlanan kare sayısı basılır.
 
+V3 — aynı koşudan 3D harita (derinlik modeli tekrar çalışmaz):
+
+```bash
+./Scripts/dcma.sh -m dcma.map.build --run Result/calisma_adi --voxel 0.03
+```
+
+Çıktı `Result/calisma_adi/map.ply`. CloudCompare veya Blender’da aç.
+Eski V2 `Result/` dizini yanlış `K` ile üretilmiş olabilir (90° dönüş ~160°);
+3D harita için VO’yu **bu dalda** yeniden koşun, sonra `map.build` çalıştırın.
+
 Yalnızca görseli yenilemek (derinlik tekrar çalışmaz):
 
 ```bash
@@ -183,6 +194,8 @@ Metre üretmez.
 | `Result/<ad>/plot.png` | Üstten yörünge + occupancy + yükseklik |
 | `Result/<ad>/occupancy.npz` | Kabaca duvar ızgarası (hit’ler + kare indeksi) |
 | `Result/<ad>/occupancy.png` | Aynı haritanın kuş bakışı görüntüsü |
+| `Result/<ad>/map.ply` | V3: birleşik renkli nokta bulutu (dünya çerçevesi) |
+| `Result/<ad>/map_meta.json` | voxel, kare sayısı, xyz sınırları |
 | `Result/<ad>/preview.png` | Ortadaki kareden still (yerel; README’de GIF kullanılır) |
 | `Result/<ad>/frames/` | Ara bellek PNG — çıktı değil |
 | `Result/<ad>/depth_cache/` | Derinlik `.npy` önbelleği |
@@ -209,7 +222,7 @@ Metre üretmez.
 
 ## ⚠️ Bilinen Sınırlamalar
 
-Bu bir **araştırma prototipidir** (V2).
+Bu bir **araştırma prototipidir** (V3).
 
 | # | Sınırlama | Neden / Etki |
 |:--|:---|:---|
@@ -220,6 +233,7 @@ Bu bir **araştırma prototipidir** (V2).
 | 5 | **Sağlamlık kapıları eksik** | Essential-matrix çapraz kontrolü ve hız kapısı henüz yok. |
 | 6 | **Çözünürlük** | `--max-edge` küçültmesi görseli ve `K`’yı değiştirir. |
 | 7 | **Harita kroki, CAD değil** | Occupancy Depth-Anything + PnP drift’e bağlı. Döngü kapatma yok: geri dönünce duvarlar kayabilir. Masa/kapı da “duvar” hücresi olabilir. |
+| 8 | **3D `map.ply` VO’yu miras alır** | Aynı `T_wc`. Yanlış FOV/`K` ile koşulmuş Result’ta 90° dönüş şişer. VGGT / döngü kapatma yok. |
 
 ---
 
@@ -228,6 +242,7 @@ Bu bir **araştırma prototipidir** (V2).
 - [x] Metrik derinlik + PnP VO + `trajectory.json`
 - [x] CLI, Data/Result ayrımı, H.264 annotate, minimap
 - [x] Kabaca duvar occupancy (minimap + plot + occupancy.npz)
+- [x] 3D nokta haritası (`map.ply`, mevcut VO + derinlik)
 - [ ] TUM RGB-D ATE/RPE + ölçek yanlılığı
 - [ ] Paralaks keyframe + sağlamlık kapıları
 - [x] Dönme (pan) HUD + minimap bakış oku
@@ -245,6 +260,7 @@ Bu bir **araştırma prototipidir** (V2).
 | **4** | Göreli Depth Anything + 3×3 bölge farkı | Yön etiketi var, metre yok, ~%65 BELİRSİZ |
 | **5 (V1)** | **Metrik derinlik + PnP görsel odometri** | Metre + yörünge + annotate video |
 | **6 (V2)** | **Occupancy ızgarası (kuş bakışı duvar)** | Minimap/plot’ta kabaca duvar; döngü kapatma yok |
+| **7 (V3)** | **3D `map.ply` + uzun kenar FOV** | Videodaki kareler dünya bulutuna basılır; portre `K` şişmesi kapatıldı |
 
 Kilit içgörü aynı: **2B kaymayı sınıf etiketine çevirmek yerine 3B yapıyı ölçmek.**
 V2 bunu kaba bir kat planına da bağlar.
@@ -261,7 +277,7 @@ Depth-Based-Camera-Motion-Analyzer/
 │   ├── dcma.sh               # local.env'deki yorumlayıcıyla çalıştırır
 │   ├── legacy_distance_4_2.py
 │   └── make_demo_gif.sh
-├── src/dcma/                 # metrik VO + görselleştirme + occupancy
+├── src/dcma/                 # metrik VO + görselleştirme + occupancy + 3D map
 ├── tests/
 ├── docs/
 ├── assets/
@@ -278,5 +294,5 @@ Depth-Based-Camera-Motion-Analyzer/
 ---
 
 <div align="center">
-<sub>Bilgisayarla görü / monoküler metrik görsel odometri üzerine bir araştırma çalışması. V2.</sub>
+<sub>Bilgisayarla görü / monoküler metrik görsel odometri üzerine bir araştırma çalışması. V3.</sub>
 </div>
