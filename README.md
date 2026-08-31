@@ -20,34 +20,45 @@ ve sonuç annotate videoya, grafiklere yazılır.
 
 ## 🎬 Demo
 
-İç mekân, 3840×2160 @ 60 fps, ~35 sn’lik bir çekimin annotate özeti (3× hız, 5 fps, 59 kare) ve yörünge grafiği:
+Ofis gezisi (natif portre 2176×3840 @ 60 fps, ~27 sn). Annotate özeti 3× hız, 5 fps, 280 px:
 
 <div align="center">
 
-![Annotate video: renkli izler, HUD ve minimap, tüm çekim](assets/demo.gif)
+![Ofis gezisi annotate: renkli izler, HUD, minimap ve occupancy](assets/demo.gif)
 
 </div>
 
-**`demo.gif` — tüm çekim, seyrek karelerle.** Ne görünüyor:
+**`demo.gif` — ofis çekiminin tamamı, seyrek karelerle.** Ne görünüyor:
 
 | Bölge | Anlamı |
 |:---|:---|
 | **Renkli noktalar + kuyruk** | Her nokta ayrı bir özellik; rengi sabittir. Arkada kalan çizgi o noktanın **ekrandaki gerçek yoludur** (kare-kare Lucas-Kanade), iki uç arasında çekilmiş düz kiriş değildir. |
 | **Sol üst yazılar** | Kare numarası ve o ana kadar biriken metre: `ileri` / `saga` / `yukari`. |
-| **Sol alt kare (minimap)** | Kuş bakışı yörünge + **gri occupancy** (kabaca duvar). **Yeşil** = çekimin başlangıcı, **kırmızı** = kameranın şu anki yeri, beyaz/renkli çizgi = gidilen yol. Duvar hücreleri o ana kadar birikir. Kamera yeşil–kırmızı mesafesine göre kayar; mesafe azalınca (geri dönüş) görüş donar. |
-| **Sağ alt etiket** | O anki baskın öteleme yönü: İLERİ, GERİ, SAĞA, SOLA, YUKARI, AŞAĞI veya DURAGAN. |
+| **Sol alt kare (minimap)** | Kuş bakışı yörünge + **gri occupancy** (kabaca duvar). **Yeşil** = çekimin başlangıcı, **kırmızı** = kameranın şu anki yeri, beyaz/renkli çizgi = gidilen yol. Duvar hücreleri o ana kadar birikir. |
+| **Sağ alt etiket** | O anki baskın öteleme veya dönüş: İLERİ, SAĞA DÖN, vb. |
 
 <div align="center">
-<img src="assets/plot.png" width="720" alt="Üstten yörünge ve yükseklik profili">
+<img src="assets/plot.png" width="720" alt="Üstten yörünge, occupancy ve yükseklik profili">
 </div>
 
-**`plot.png` — tüm çekimin özeti (tek bakışta).** Ne görünüyor:
+**`plot.png` — ofis gezisinin 2D özeti.** Ne görünüyor:
 
 | Panel | Anlamı |
 |:---|:---|
-| **Üstten görünüm** (sol) | Dünya düzlemi: yatay **sağa (m)**, dikey **ileri (m)**. Gri ızgara kabaca duvar; yeşil başlangıç, kırmızı bitiş, çizgi yol. |
-| **Yükseklik profili** (sağ) | Adım adım **yukarı (m)**. El kamerasının salınımı ve kat çıkışı burada okunur. |
-| **Başlık** | `net` = başlangıç–bitiş kuş uçuşu mesafe. `yol` = odometre (gidilen toplam yol). Gidip dönünce yol büyür, net küçük kalır — bu beklenen ayrım. |
+| **Üstten görünüm** (sol) | Dünya düzlemi: yatay **sağa (m)**, dikey **ileri (m)**. Gri ızgara kabaca duvar; yeşil başlangıç, kırmızı bitiş, çizgi yol. L koridor bu düzlemde okunur. |
+| **Yükseklik profili** (sağ) | Adım adım **yukarı (m)**. El kamerasının salınımı burada okunur. |
+| **Başlık** | `net` = başlangıç–bitiş kuş uçuşu mesafe. `yol` = odometre (gidilen toplam yol). |
+
+<div align="center">
+<img src="assets/map_preview.png" width="720" alt="3D nokta bulutu ve üstten projeksiyon">
+</div>
+
+**`map_preview.png` — aynı koşunun 3D haritası.** Ne görünüyor:
+
+| Panel | Anlamı |
+|:---|:---|
+| **3D harita** (sol) | Keyframe derinlikleri `T_wc` ile dünyaya basılır (`map.ply`). Tavan (`up_max=1.2` m, ilk kare göz=0) kesilir ki iç mekân görünsün. |
+| **Üstten projeksiyon** (sağ) | Aynı bulutun kuş bakışı; 2D occupancy’den bağımsız, renk videodan gelir. |
 
 Asıl teslim dosyası `Result/<ad>/<ad>.mp4` (H.264, kaynak FPS). `Result/<ad>/frames/` ham kare önbelleğidir; çıktı değildir.
 
@@ -165,6 +176,10 @@ PYTHONPATH=src python -m dcma.cli \
 ve atlanan kare sayısı basılır. Aynı komut `map.ply` + `map_preview.png` üretir
 (`--no-map` ile kapatılır).
 
+`--yaw-scale` (varsayılan `0.88`) PnP yaw’ı küçültür; `1.0` ham. `--up-max` (varsayılan `1.2` m)
+3D haritada tavanı keser (ilk kare göz hizası = 0). 2D occupancy kameraya `0.8` m’den yakın
+hit’leri, görüntü ortasını ve kare medyanından çok daha yakın derinlikleri atar.
+
 Eski V2 `Result/` yanlış `K` taşıyabilir; 3D harita için VO’yu V3’te yeniden koşun.
 
 Yalnızca haritayı yenilemek (VO yok):
@@ -201,9 +216,9 @@ Metre üretmez.
 | `Result/<ad>/frames/` | Ara bellek PNG — çıktı değil |
 | `Result/<ad>/depth_cache/` | Derinlik `.npy` önbelleği |
 
-**Referans koşu (V1):** 3840×2160 @ 60 fps, ~35 sn, 2112 kare, `--max-edge 768`.
-234 adım, 0 atlama. Örnek: odometre ileri +1.64 m, yol 28.98 m, net 1.91 m
-(ileri/geri/sol/sağ çekimi — yol > net beklenir). Şeritmetre / TUM ile henüz doğrulanmadı.
+**Referans koşu (V3, `ofis_gezisi.mp4`):** 2176×3840 portre @ 60 fps, ~27 sn, 1637 kare,
+`--max-edge 768 --interval 0.15`. 181 adım, 0 atlama. Yol 21.37 m, net |11.92| m
+(ileri +3.74 m, sağa +11.28 m). Şeritmetre / TUM ile henüz doğrulanmadı.
 
 ---
 
@@ -216,8 +231,8 @@ Metre üretmez.
 | Görselleştirme izi | Shi-Tomasi + Lucas-Kanade, noktaya özel renk |
 | Video yazımı | ffmpeg `libx264` `yuv420p` (OpenCV `mp4v` FPS’i bozuyordu) |
 | Minimap | Tüm yol + occupancy AABB; geri dönüşte görüş donar; kenar payı %8; kırmızı noktada bakış oku |
-| Occupancy | 10 cm xz ızgarası, kamera-yüksekliği dilimi, döngü kapatma yok |
-| 3D harita | `map.ply` + `map_preview.png`; voxel 3 cm (varsayılan) |
+| Occupancy | 10 cm xz ızgarası, kamera-yüksekliği dilimi, yakın hit (`0.8` m) atılır, döngü kapatma yok |
+| 3D harita | `map.ply` + `map_preview.png`; voxel 3 cm; tavan `up_max=1.2` m kesilir |
 | Kamera ekseni | OpenCV: `+x` sağ, `+y` aşağı, `+z` ileri; HUD `yaw_deg<0` → SAĞA DÖN |
 
 ---
@@ -230,12 +245,12 @@ Bu bir **araştırma prototipidir** (V3).
 |:--|:---|:---|
 | 1 | **Ölçek modelden gelir** | Monoküler geometri mutlak metre veremez; Indoor checkpoint yanlı olabilir. TUM / şeritmetre henüz yok. |
 | 2 | **`K` kaba** | Kalibrasyon yoksa yatay FOV 70° varsayılır. Yanlış `K` tüm metreyi çarpar. |
-| 3 | **Yerinde dönüş** | HUD `SAĞA DÖN` / `SOLA DÖN` + bakış oku. `\|yaw\|≥8°` adımında öteleme atılır (cam sapmasını keser; yürüyerek keskin viraj o adımda mesafeyi kaybeder). Minimap AABB kırmızıyı çerçevede tutar. Döngü kapatma yok. |
+| 3 | **Yerinde dönüş** | HUD `SAĞA DÖN` / `SOLA DÖN` + bakış oku. `\|yaw\|≥8°` adımında öteleme atılır (cam sapmasını keser; yürüyerek keskin viraj o adımda mesafeyi kaybeder). Yana kaymada sahte ileri sıfırlanır. `--yaw-scale` 0.88 sezgiseldir, kalibrasyon değil. Minimap AABB kırmızıyı çerçevede tutar. Döngü kapatma yok. |
 | 4 | **Keyframe yok** | Sabit zaman aralığı (`--interval`). Çok yavaş/hızlı harekette eşleme zayıflar. |
 | 5 | **Sağlamlık kapıları eksik** | Essential-matrix çapraz kontrolü ve hız kapısı henüz yok. |
 | 6 | **Çözünürlük** | `--max-edge` küçültmesi görseli ve `K`’yı değiştirir. |
 | 7 | **Harita kroki, CAD değil** | Occupancy Depth-Anything + PnP drift’e bağlı. Döngü kapatma yok: geri dönünce duvarlar kayabilir. Masa/kapı da “duvar” hücresi olabilir. |
-| 8 | **3D `map.ply` VO’yu miras alır** | Aynı `T_wc`. Yanlış FOV/`K` ile koşulmuş Result’ta 90° dönüş şişer. VGGT / döngü kapatma yok. |
+| 8 | **3D `map.ply` VO’yu miras alır** | Aynı `T_wc`. Yanlış FOV/`K` ile koşulmuş Result’ta 90° dönüş şişer. Tavan `up_max` (1.2 m) üstü kesilir; gerçek tavan geometrisi 3D’de yoktur. VGGT / döngü kapatma yok. |
 
 ---
 
@@ -283,8 +298,9 @@ Depth-Based-Camera-Motion-Analyzer/
 ├── tests/
 ├── docs/
 ├── assets/
-│   ├── demo.gif              # README: tüm çekimin annotate GIF’i
-│   └── plot.png              # README: yörünge özeti
+│   ├── demo.gif              # README: ofis gezisi annotate GIF’i
+│   ├── plot.png              # README: 2D yörünge + occupancy
+│   └── map_preview.png       # README: 3D harita önizlemesi
 ├── local.env.example         # kopyalayıp local.env yapın (git'e girmez)
 ├── README.md
 ├── pyproject.toml
